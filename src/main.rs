@@ -28,7 +28,7 @@ fn main() {
 #[component]
 fn App() -> Element {
     rsx! {
-        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        document::Stylesheet { href: asset!("/assets/tailwind.css") }
 
         Router::<Route> {}
     }
