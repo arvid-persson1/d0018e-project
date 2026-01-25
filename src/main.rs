@@ -18,8 +18,6 @@ enum Route {
         Product { id: u32 },
 }
 
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
-
 fn main() {
     dioxus::launch(App);
 }
