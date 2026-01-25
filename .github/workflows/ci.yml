@@ -21,6 +21,10 @@ jobs:
           components: |
             rustfmt
             clippy
+          target: wasm32-unknown-unknown
+
+      - name: Install Dioxus CLI
+        run: curl -sSL https://dioxus.dev/install.sh | bash
 
       - name: Format (Rust)
         run: cargo fmt -- --check
@@ -28,14 +32,14 @@ jobs:
       - name: Format (RSX)
         run: dx fmt --check
 
-      - name: Build
+      - name: Compile
         run: dx check
 
       - name: Lint
         run: cargo clippy
 
-      - name: Docs
+      - name: Build documentation
         run: cargo rustdoc -- -Z unstable-options --check
 
-      - name: Test
+      - name: Tests
         run: cargo test --verbose
