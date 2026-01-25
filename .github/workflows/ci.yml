@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+
+env:
+  RUSTDOCFLAGS: "-Dwarnings"
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: |
+            rustfmt
+            clippy
+
+      - name: Format (Rust)
+        run: cargo fmt -- --check
+
+      - name: Format (RSX)
+        run: dx fmt --check
+
+      - name: Build
+        run: dx check
+
+      - name: Lint
+        run: cargo clippy
+
+      - name: Docs
+        run: cargo rustdoc -- -Z unstable-options --check
+
+      - name: Test
+        run: cargo test --verbose
