@@ -1,19 +1,19 @@
 [package]
 # TODO: Rename.
-name = "d0018e-project"
-version = "0.1.0"
 edition = "2024"
 license = "MIT"
+name = "d0018e-project"
 readme = "README.md"
 repository = "https://www.github.com/arvid-persson1/d0018e-project"
+version = "0.1.0"
 
 [dependencies]
-dioxus = { version = "0.7.1", features = ["router", "fullstack"] }
+dioxus = { features = ["fullstack", "router"], version = "0.7.1" }
 
 [features]
 default = ["web"]
-web = ["dioxus/web"]
 server = ["dioxus/server"]
+web = ["dioxus/web"]
 
 [profile.dev]
 codegen-units = 256
@@ -27,17 +27,17 @@ panic = "unwind"
 strip = "none"
 
 [profile.release]
+codegen-units = 16
+# WARN: May make debugging more difficult, but proper logging should make this unnecessary.
 debug = false
-opt-level = 3
-# WARN: May make backtraces less useful. Downgrade to "debuginfo" if needed.
 debug-assertions = false
+incremental = false
+opt-level = 3
 overflow-checks = false
+# WARN: May make backtraces less useful. Downgrade to "debuginfo" if needed.
 strip = "symbols"
 # PERF: Consider "fat" if performance gain is worth the extra build time.
 lto = "thin"
-# WARN: May make debugging more difficult, but proper logging should make this unnecessary.
-codegen-units = 16
-incremental = false
 panic = "abort"
 
 [workspace.lints.rust]

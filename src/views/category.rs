@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
-/// The page for a product.
+/// The page for a category.
 #[component]
-pub fn Product(id: i32) -> Element {
+pub fn Category(id: i32) -> Element {
     rsx! { "Product {id}" }
 }

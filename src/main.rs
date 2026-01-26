@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use views::{Home, Navbar, Product};
+use views::{Administration, Category, CustomerProfile, Home, Navbar, Product, VendorProfile};
 
 mod components;
 mod views;
@@ -10,12 +10,22 @@ mod views;
 /// rendered.
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
+// TODO: Add fallback page.
 enum Route {
     #[layout(Navbar)]
         #[route("/")]
         Home {},
+        // Can only visit own profile; no ID needed.
+        #[route("/profile")]
+        CustomerProfile {},
+        #[route("/vendor/:id")]
+        VendorProfile { id: i32 },
         #[route("/product/:id")]
-        Product { id: u32 },
+        Product { id: i32 },
+        #[route("/category/:id")]
+        Category { id: i32 },
+        #[route("/admin")]
+        Administration {}
 }
 
 fn main() {
