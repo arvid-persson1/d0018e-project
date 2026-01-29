@@ -2,17 +2,18 @@
 # TODO: Rename.
 edition = "2024"
 license = "MIT"
-name = "d0018e-project"
+name = "boop"
 readme = "README.md"
 repository = "https://www.github.com/arvid-persson1/d0018e-project"
 version = "0.1.0"
 
 [dependencies]
+database = { optional = true, path = "database", version = "0.1.0" }
 dioxus = { features = ["fullstack", "router"], version = "0.7.1" }
 
 [features]
 default = ["web"]
-server = ["dioxus/server"]
+server = ["dep:database", "dioxus/server"]
 web = ["dioxus/web"]
 
 [profile.dev]
@@ -39,6 +40,9 @@ strip = "symbols"
 # PERF: Consider "fat" if performance gain is worth the extra build time.
 lto = "thin"
 panic = "abort"
+
+[workspace]
+members = ["database"]
 
 [workspace.lints.rust]
 # Core language features and proper use of common APIs.
@@ -340,7 +344,6 @@ verbose_file_reads = "deny"
 zero_sized_map_values = "deny"
 # Documentation, debug remnants, tests, error messages.
 allow_attributes_without_reason = "deny"
-cargo_common_metadata = "deny"
 dbg_macro = "deny"
 doc_broken_link = "deny"
 doc_comment_double_space_linebreaks = "deny"
@@ -359,6 +362,8 @@ tests_outside_test_module = "deny"
 too_long_first_doc_paragraph = "deny"
 undocumented_unsafe_blocks = "deny"
 use_debug = "deny"
+# Not inteded for publishing.
+cargo_common_metadata = "allow"
 # Suspicious or dangerous patterns, possibly with legitimate use cases.
 clone_on_ref_ptr = "deny"
 coerce_container_to_any = "deny"

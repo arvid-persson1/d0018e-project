@@ -20,3 +20,6 @@ pub use category::Category;
 
 mod admin;
 pub use admin::Administration;
+
+mod favorites;
+pub use favorites::Favorites;

@@ -1,6 +1,10 @@
+#![allow(clippy::cargo_common_metadata)]
+
 use dioxus::prelude::*;
 
-use views::{Administration, Category, CustomerProfile, Home, Navbar, Product, VendorProfile};
+use views::{
+    Administration, Category, CustomerProfile, Favorites, Home, Navbar, Product, VendorProfile,
+};
 
 mod components;
 mod views;
@@ -18,6 +22,8 @@ enum Route {
         // Can only visit own profile; no ID needed.
         #[route("/profile")]
         CustomerProfile {},
+        #[route("/favorites")]
+        Favorites {},
         #[route("/vendor/:id")]
         VendorProfile { id: i32 },
         #[route("/product/:id")]
