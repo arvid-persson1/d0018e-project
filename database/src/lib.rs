@@ -1,4 +1,9 @@
 #![feature(if_let_guard)]
+#![expect(unused_imports, reason = "TODO")]
+#![expect(unused_variables, reason = "TODO")]
+#![expect(dead_code, reason = "TODO")]
+#![expect(clippy::unused_async, reason = "TODO")]
+#![expect(clippy::todo, reason = "TODO")]
 
 //! Database operations.
 
