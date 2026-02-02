@@ -1,4 +1,3 @@
-use crate::components::Echo;
 use dioxus::prelude::*;
 
 /// The home page.
@@ -6,6 +5,5 @@ use dioxus::prelude::*;
 pub fn Home() -> Element {
     rsx! {
         h1 { class: "text-sky-500", "Home page" }
-        Echo {}
     }
 }

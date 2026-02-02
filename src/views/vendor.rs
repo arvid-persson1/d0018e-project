@@ -1,7 +1,8 @@
+use crate::{Id, Vendor};
 use dioxus::prelude::*;
 
 /// The profile page for a vendor.
 #[component]
-pub fn VendorProfile(id: i32) -> Element {
-    rsx! { "Profile of vendor {id}" }
+pub fn VendorPage(id: Id<Vendor>) -> Element {
+    rsx! { "Page of vendor {id}" }
 }

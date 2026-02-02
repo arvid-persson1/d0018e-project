@@ -1,7 +1,8 @@
+use crate::{Category, Id};
 use dioxus::prelude::*;
 
 /// The page for a category.
 #[component]
-pub fn Category(id: i32) -> Element {
+pub fn CategoryPage(id: Id<Category>) -> Element {
     rsx! { "Product {id}" }
 }
