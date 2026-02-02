@@ -1,5 +1,4 @@
 [package]
-# TODO: Rename.
 edition = "2024"
 license = "MIT"
 name = "boop"
@@ -8,12 +7,31 @@ repository = "https://www.github.com/arvid-persson1/d0018e-project"
 version = "0.1.0"
 
 [dependencies]
-database = { optional = true, path = "database", version = "0.1.0" }
+chrono = { default-features = false, features = ["std"], version = "0.4.43" }
+derive_more = { default-features = false, features = [
+    "deref",
+    "display",
+    "into",
+    "std",
+], version = "2.1.1" }
 dioxus = { features = ["fullstack", "router"], version = "0.7.1" }
+dotenvy = { default-features = false, optional = true, version = "0.15.7" }
+num-traits = { default-features = false, features = ["std"], version = "0.2.19" }
+regex = { default-features = false, features = [
+    "perf",
+    "perf-dfa-full",
+    "std",
+    "unicode-gencat",
+], version = "1.12.2" }
+rust_decimal = { default-features = false, features = ["std"], version = "1.40.0" }
+sqlx = { default-features = false, features = [
+    "macros",
+    "postgres",
+], optional = true, version = "0.8.6" }
 
 [features]
 default = ["web"]
-server = ["dep:database", "dioxus/server"]
+server = ["dep:dotenvy", "dep:sqlx", "dioxus/server"]
 web = ["dioxus/web"]
 
 [profile.dev]
@@ -29,22 +47,19 @@ strip = "none"
 
 [profile.release]
 codegen-units = 16
-# WARN: May make debugging more difficult, but proper logging should make this unnecessary.
+# WARN: Might make debugging more difficult, but proper logging should make this unnecessary.
 debug = false
 debug-assertions = false
 incremental = false
 opt-level = 3
 overflow-checks = false
-# WARN: May make backtraces less useful. Downgrade to "debuginfo" if needed.
+# WARN: Might make backtraces less useful. Downgrade to "debuginfo" if needed.
 strip = "symbols"
 # PERF: Consider "fat" if performance gain is worth the extra build time.
 lto = "thin"
 panic = "abort"
 
-[workspace]
-members = ["database"]
-
-[workspace.lints.rust]
+[lints.rust]
 # Core language features and proper use of common APIs.
 ambiguous_negative_literals = "allow"
 closure_returning_async_block = "allow"
@@ -72,7 +87,6 @@ unused_extern_crates = "deny"
 unused_import_braces = "deny"
 unused_lifetimes = "deny"
 unused_macro_rules = "deny"
-unused_qualifications = "deny"
 # Documentation, debug remnants, tests, error messages.
 missing_docs = "deny"
 # Suspicious or dangerous patterns, possibly with legitimate use cases.
@@ -107,8 +121,10 @@ rust_2024_prelude_collisions = "forbid"
 # Forward compatibility regarding never type.
 dependency_on_unit_never_type_fallback = "warn"
 never_type_fallback_flowing_into_unsafe = "deny"
+# False positives with DIoxus.
+unused_qualifications = "allow"
 
-[workspace.lints.clippy]
+[lints.clippy]
 # Opposites of checked lints, covered by other lints.
 allow_attributes = "allow"
 self_named_module_files = "allow"
@@ -457,5 +473,6 @@ ptr_as_ptr = "forbid"
 ptr_cast_constness = "forbid"
 ref_as_ptr = "forbid"
 swap_ptr_to_ref = "forbid"
-transmute_ptr_to_ptr = "forbid"
 transmute_undefined_repr = "forbid"
+# Required by Dioxus (can't be `forbid`).
+transmute_ptr_to_ptr = "deny"
