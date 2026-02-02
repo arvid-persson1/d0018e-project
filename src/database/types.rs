@@ -116,7 +116,7 @@ impl Username {
     ///
     /// # Safety
     ///
-    /// Must ensure the string fits the format.
+    /// Must ensure the string fits the format, see [type documentation](Self).
     #[inline]
     #[must_use]
     pub const unsafe fn new_unchecked(s: Box<str>) -> Self {
