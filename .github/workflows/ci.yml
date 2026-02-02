@@ -2,6 +2,14 @@ name: CI
 
 on:
   push:
+    paths:
+      - clippy.toml
+      - rust-toolchain.toml
+      - src/**
+      - Dioxus.toml
+      - rustfmt.toml
+      - taplo.toml
+      - Cargo.toml
 
 env:
   RUST_BACKTRACE: 1
@@ -71,7 +79,7 @@ jobs:
         with:
           toolchain: nightly
       # WARN: Could miss cases where code stops working with a feature enabled, but works without it.
-      - run: cargo test --all-targets  dioxus:
+      - run: cargo test --all-targets
 
   dioxus:
     name: Dioxus
