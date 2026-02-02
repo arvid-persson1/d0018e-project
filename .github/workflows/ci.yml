@@ -2,14 +2,6 @@ name: CI
 
 on:
   push:
-    paths:
-      - clippy.toml
-      - rust-toolchain.toml
-      - src/**
-      - Dioxus.toml
-      - rustfmt.toml
-      - taplo.toml
-      - Cargo.toml
 
 env:
   RUST_BACKTRACE: 1
