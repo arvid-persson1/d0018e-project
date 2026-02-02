@@ -10,7 +10,6 @@ pub fn Navbar() -> Element {
             Link { to: Route::Home {}, "Home" }
             Link { to: Route::ProductPage { id: 1.into() }, "Sample product" }
         }
-        Outlet::<Route> {
-        }
+        Outlet::<Route> {}
     }
 }
