@@ -54,9 +54,10 @@ BEGIN
         WHEN 'INSERT' THEN CURRENT_TIMESTAMP
         WHEN 'UPDATE' THEN OLD.created_at
     END;
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql VOLATILE;
 
 CREATE TRIGGER users_creation_time
 BEFORE INSERT OR UPDATE ON users
@@ -67,7 +68,7 @@ BEGIN
     NEW.updated_at := CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql VOLATILE;
 
 CREATE TRIGGER users_update_time
 BEFORE UPDATE ON users
@@ -94,7 +95,7 @@ BEGIN
     WHERE id = NEW.id;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql VOLATILE;
 
 CREATE TRIGGER customers_update_time_super
 BEFORE UPDATE ON customers
@@ -134,7 +135,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER users_valid_subclass
 AFTER INSERT OR UPDATE OF role ON users
@@ -153,7 +154,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER customers_valid_superclass
 BEFORE INSERT OR UPDATE OF id ON customers
@@ -179,7 +180,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER users_valid_role_change
 BEFORE UPDATE OF role ON users
@@ -189,11 +190,10 @@ CREATE FUNCTION validate_user_subclass_deletion() RETURNS TRIGGER AS $$
 BEGIN
     IF EXISTS (SELECT 1 FROM users WHERE id = OLD.id) THEN
         RAISE EXCEPTION 'Must remove user superclass along with subclass.';
-    ELSE
-        RETURN OLD;
     END IF;
+    RETURN OLD;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER customers_deletion
 BEFORE DELETE ON customers
@@ -216,7 +216,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER customers_unique_superclass
 BEFORE INSERT OR UPDATE OF id ON customers
@@ -232,29 +232,37 @@ CREATE TABLE categories (
     parent INT REFERENCES categories(id) ON DELETE CASCADE
 );
 
+CREATE TYPE category_path_segment AS (id INT NOT NULL, name TEXT NOT NULL);
+CREATE FUNCTION category_path(start_id INT) RETURNS category_path_segment[] AS $$
+DECLARE
+    path category_path_segment[] := ARRAY[]::category_path_segment[];
+    current categories%ROWTYPE;
+BEGIN
+    current.id := start_id;
+    
+    LOOP
+        SELECT * INTO current FROM categories WHERE id = current.id;
+        IF EXISTS (SELECT 1 FROM unnest(path) WHERE id = current.id) THEN
+            RAISE EXCEPTION 'Cycle detected.';
+        END IF;
+
+        path := ARRAY[(current.id, current.name)] || path;
+
+        IF current.parent IS NULL THEN
+            EXIT;
+        END IF;
+
+        current.id := current.parent;
+    END LOOP;
+
+    RETURN path;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
 CREATE FUNCTION categories_validate_tree() RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.PARENT IS NULL THEN
-        RETURN NEW;
-    ELSIF NEW.PARENT = NEW.ID THEN
-        RAISE EXCEPTION 'Self-loop detected.';
-    ELSIF EXISTS(
-        WITH RECURSIVE traversal AS (
-            SELECT id, parent
-            FROM categories
-            WHERE id = NEW.parent
-            UNION ALL
-            SELECT categories.parent
-            FROM categories
-            INNER JOIN traversal ON categories.id = traversal.parent
-            WHERE categories.parent IS NOT NULL
-        )
-        SELECT 1 FROM traversal WHERE id = NEW.id
-    ) THEN
-        RAISE EXCEPTION 'Cycle detected';
-    ELSE
-        RETURN NEW;
-    END IF;
+    PERFORM category_path(NEW.id);
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
@@ -334,9 +342,9 @@ BEGIN
         AND tsrange(valid_from, valid_until, '[)') && tsrange(NEW.valid_from, NEW.valid_until, '[)')
     ) THEN
         RAISE EXCEPTION 'Attempted to create overlapping special offers. Consider deactivating one.';
-    ELSE
-        RETURN NEW;
     END IF;
+
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
@@ -348,14 +356,12 @@ CREATE FUNCTION offers_validate_discount() RETURNS TRIGGER AS $$
 BEGIN
     -- We allow this invariant to be broken for inactive offers as price changes should be allowed
     -- for these without restrictions.
-    IF NEW.active
-        AND NEW.new_price IS NOT NULL
-        AND NEW.new_price / COALESCE(NEW.quantity2, 1) >= (SELECT price FROM products WHERE id = NEW.product)
+    IF NEW.active AND NEW.new_price / COALESCE(NEW.quantity2, 1) >= (SELECT price FROM products WHERE id = NEW.product)
     THEN
         RAISE EXCEPTION 'Special offer must actually result in a discount.';
-    ELSE
-        RETURN NEW;
     END IF;
+
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
@@ -373,9 +379,9 @@ BEGIN
         AND so.new_price / COALESCE(so.quantity2, 1) >= NEW.price
     ) THEN
         RAISE EXCEPTION 'Attempted to lower price under special offer. Consider changing the special offer.';
-    ELSE
-        RETURN NEW;
     END IF;
+
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
@@ -424,7 +430,7 @@ CREATE FUNCTION process_expiries() RETURNS void AS $$
     SET in_stock = GREATEST(0, products.in_stock - counts.count)
     FROM counts
     WHERE products.id = counts.product;
-$$ LANGUAGE sql;
+$$ LANGUAGE sql VOLATILE;
 
 -- WARN: Only actually runs at midnight. If the database is down at that time, expiries will be
 -- missed. Hence, call this function on establishing a connection to the database. If this is done,
@@ -497,9 +503,9 @@ BEGIN
         AND NEW.review != (SELECT review FROM comments WHERE id = NEW.parent)
     THEN
         RAISE EXCEPTION 'Parent comment must belong to same review as all children.';
-    ELSE
-        RETURN NEW;
     END IF;
+
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
@@ -508,28 +514,24 @@ BEFORE INSERT OR UPDATE OF parent, review ON comments
 FOR EACH ROW EXECUTE FUNCTION comment_parent_same_review();
 
 CREATE FUNCTION comments_validate_tree() RETURNS TRIGGER AS $$
+DECLARE
+    visited INT[] := ARRAY[NEW.id];
+    current_id INT := NEW.parent;
+    current_parent INT;
 BEGIN
-    IF NEW.PARENT IS NULL THEN
-        RETURN NEW;
-    ELSIF NEW.PARENT = NEW.ID THEN
-        RAISE EXCEPTION 'Self-loop detected.';
-    ELSIF EXISTS(
-        WITH RECURSIVE traversal AS (
-            SELECT id, parent
-            FROM comments
-            WHERE id = NEW.parent
-            UNION ALL
-            SELECT comments.parent
-            FROM comments
-            INNER JOIN traversal ON comments.id = traversal.parent
-            WHERE comments.parent IS NOT NULL
-        )
-        SELECT 1 FROM traversal WHERE id = NEW.id
-    ) THEN
-        RAISE EXCEPTION 'Cycle detected';
-    ELSE
-        RETURN NEW;
-    END IF;
+    WHILE current_id IS NOT NULL LOOP
+        IF current_id = ANY(visited) THEN
+            RAISE EXCEPTION 'Cycle detected.';
+        END IF;
+
+        visited := visited || current_id;
+        SELECT parent INTO current_parent FROM comments WHERE id = current_id;
+        current_id := current_parent;
+    END LOOP;
+
+    current.id := start_id;
+    
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
