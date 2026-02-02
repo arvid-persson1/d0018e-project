@@ -80,6 +80,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
-      - run: cargo install dioxus-cli --version 0.7.1
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall dioxus-cli@0.7.1 --no-confirm
       - run: dx fmt --check
       - run: dx check --verbose
