@@ -1,49 +1,70 @@
-#![allow(clippy::cargo_common_metadata)]
+//! The fullstack web app.
+
+#![feature(if_let_guard)]
 
 use dioxus::prelude::*;
-
-use views::{
-    Administration, Category, CustomerProfile, Favorites, Home, Navbar, Product, VendorProfile,
-};
-
-mod components;
-mod views;
+use views::{CategoryPage, FavoritesPage, Home, Navbar, ProductPage, Profile, VendorPage};
+pub mod auth;
+pub mod components;
+pub mod database;
+pub mod views;
+use database::{Category, Id, Product, Vendor};
 
 /// Structure of internal routes in our app. Each variant represents a different URL pattern that
 /// can be matched by the router. If that pattern is matched, the components for that route will be
 /// rendered.
 #[derive(Debug, Clone, Routable, PartialEq)]
-#[rustfmt::skip]
-// TODO: Add fallback page.
 enum Route {
     #[layout(Navbar)]
-        #[route("/")]
-        Home {},
-        // Can only visit own profile; no ID needed.
-        #[route("/profile")]
-        CustomerProfile {},
-        #[route("/favorites")]
-        Favorites {},
-        #[route("/vendor/:id")]
-        VendorProfile { id: i32 },
-        #[route("/product/:id")]
-        Product { id: i32 },
-        #[route("/category/:id")]
-        Category { id: i32 },
-        #[route("/admin")]
-        Administration {}
+
+    /// The home page.
+    #[route("/")]
+    Home,
+    /// The profile page for a customer or vendor, or the administration page for an
+    /// administrator.
+    #[route("/profile")]
+    Profile,
+    /// The favorites page for a customer.
+    #[route("/favorites")]
+    FavoritesPage,
+    /// The page for a vendor.
+    #[route("/vendor/:id")]
+    VendorPage {
+        /// The ID of the vendor.
+        id: Id<Vendor>,
+    },
+    /// The page for a product.
+    #[route("/product/:id")]
+    ProductPage {
+        /// The ID of the product.
+        id: Id<Product>,
+    },
+    /// The page for a category.
+    #[route("/category/:id")]
+    CategoryPage {
+        /// The ID of the category.
+        id: Id<Category>,
+    },
 }
 
 fn main() {
+    #[cfg(feature = "server")]
+    {
+        use dotenvy as _;
+    }
+
     launch(App);
 }
 
 /// The main component.
 #[component]
+#[allow(
+    clippy::volatile_composites,
+    reason = "Violated but not silenced by Dioxus."
+)]
 fn App() -> Element {
     rsx! {
-        document::Stylesheet { href: asset!("/assets/tailwind.css") }
-
+        Stylesheet { href: asset!("/assets/tailwind.css") }
         Router::<Route> {}
     }
 }
