@@ -1,6 +1,10 @@
 use dioxus::prelude::*;
 
-use views::{Administration, Category, CustomerProfile, Home, Navbar, Product, VendorProfile};
+use crate::state::GlobalState;
+use crate::views::{Home, CustomerProfile, VendorProfile, Product, Category, Administration};
+
+use crate::components::navbar::Navbar;
+mod state;
 
 mod components;
 mod views;
@@ -12,10 +16,10 @@ mod views;
 #[rustfmt::skip]
 // TODO: Add fallback page.
 enum Route {
+    
     #[layout(Navbar)]
         #[route("/")]
         Home {},
-        // Can only visit own profile; no ID needed.
         #[route("/profile")]
         CustomerProfile {},
         #[route("/vendor/:id")]
@@ -29,15 +33,25 @@ enum Route {
 }
 
 fn main() {
-    launch(App);
+    launch(MainApp);
 }
 
-/// The main component.
 #[component]
-fn App() -> Element {
+fn MainApp() -> Element {
+    
+    use_context_provider(|| Signal::new(GlobalState { 
+        cart_count: 0, 
+        fav_count: 0 
+    }));
+
     rsx! {
-        document::Stylesheet { href: asset!("/assets/tailwind.css") }
+        script { src: "https://cdn.tailwindcss.com" }
+        document::Link {
+            rel: "stylesheet",
+            href: "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css",
+        }
 
         Router::<Route> {}
     }
 }
+
