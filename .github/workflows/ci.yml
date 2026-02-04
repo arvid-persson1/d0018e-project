@@ -14,6 +14,7 @@ on:
 
 env:
   RUST_BACKTRACE: 1
+  RUSTDOCFLAGS: -Dwarnings
 
 jobs:
   fmt:
@@ -35,7 +36,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
-      - run: cargo check --all-targets --all-features
+      - run: cargo check --all-targets
+      - run: cargo check --all-targets -F server
 
   docs:
     name: Documentation
@@ -46,9 +48,8 @@ jobs:
         with:
           toolchain: nightly
           components: rustfmt
-      - run: cargo doc --no-deps --all-features --document-private-items
-        env:
-          RUSTDOCFLAGS: -Dwarnings
+      - run: cargo doc --no-deps --document-private-items -F server 
+      - run: cargo doc --no-deps --document-private-items
 
   clippy:
     name: Lint
@@ -59,7 +60,8 @@ jobs:
         with:
           toolchain: nightly
           components: clippy
-      - run: cargo clippy --all-targets --all-features --future-incompat-report
+      - run: cargo clippy --all-targets --future-incompat-report
+      - run: cargo clippy --all-targets --future-incompat-report -F server
 
   tests:
     name: Tests
@@ -69,7 +71,6 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
-      # WARN: Could miss cases where code stops working with a feature enabled, but works without it.
       - run: cargo test --all-targets
 
   dioxus:
