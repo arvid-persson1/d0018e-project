@@ -4,7 +4,6 @@
 
 use dioxus::prelude::*;
 use views::{CategoryPage, FavoritesPage, Home, Navbar, ProductPage, Profile, VendorPage};
-pub mod auth;
 pub mod components;
 pub mod database;
 pub mod views;
@@ -47,15 +46,6 @@ enum Route {
     },
 }
 
-fn main() {
-    #[cfg(feature = "server")]
-    {
-        use dotenvy as _;
-    }
-
-    launch(App);
-}
-
 /// The main component.
 #[component]
 #[allow(
@@ -67,4 +57,38 @@ fn App() -> Element {
         Stylesheet { href: asset!("/assets/tailwind.css") }
         Router::<Route> {}
     }
+}
+
+/// # Panics
+///
+/// Panics if the `DATABASE_URL` environment variable is not set, or if an error occurs during
+/// communication or internally in the database.
+fn main() {
+    #[cfg(feature = "server")]
+    {
+        use database::{CONNECTION, startup};
+        use futures::executor::block_on;
+        use sqlx::PgPool as Pool;
+
+        let database_url = dotenvy::var("DATABASE_URL").expect("`DATABASE_URL` not set.");
+        block_on(async {
+            #[expect(
+                clippy::unwrap_used,
+                reason = "Main function runs first, so this will be the first to initialize the cell."
+            )]
+            CONNECTION
+                .set(
+                    Pool::connect(&database_url)
+                        .await
+                        .expect("Failed to establish a connection to the database"),
+                )
+                .unwrap();
+
+            startup()
+                .await
+                .expect("Failed to run startup code in database.");
+        });
+    }
+
+    launch(App);
 }

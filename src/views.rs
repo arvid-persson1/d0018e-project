@@ -13,6 +13,10 @@
 mod navbar;
 pub use navbar::Navbar;
 
+/// See [`ProductCard`].
+mod card;
+pub use card::ProductCard;
+
 /// See [`Home`].
 mod home;
 pub use home::Home;
