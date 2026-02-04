@@ -75,7 +75,7 @@ BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE TABLE customers (
-    id INT PRIMARY KEY REFERENCES users(id) NOT NULL ON DELETE CASCADE,
+    id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     pfp_url URL,
     -- Null: not a member.
     member_since NONFUTURE_TIMESTAMP,
@@ -83,7 +83,7 @@ CREATE TABLE customers (
 );
 
 CREATE TABLE vendors (
-    id INT PRIMARY KEY REFERENCES users(id) NOT NULL ON DELETE CASCADE,
+    id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     pfp_url URL,
     display_name TEXT NOT NULL,
     description TEXT NOT NULL
@@ -285,7 +285,7 @@ CREATE TABLE products (
     vendor INT NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
     origin TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED,
+    updated_at TIMESTAMP GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
 );
 
 CREATE TRIGGER products_creation_time
@@ -583,3 +583,5 @@ CREATE TABLE orders (
 );
 
 -- TODO: Indices.
+
+
