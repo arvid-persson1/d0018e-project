@@ -6,6 +6,7 @@ use derive_more::{Deref, Display, Into};
 use num_traits::cast::ToPrimitive as _;
 use regex::Regex;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Error as FmtError, Formatter},
     num::NonZeroU32,
@@ -14,11 +15,9 @@ use std::{
 
 /// URL to an external resource, owned.
 pub type Url = Box<str>;
-/// URL to an external resource, borrowed.
-pub type UrlRef<'a> = &'a str;
 
 /// Quantity of a product along with unit, e.g. "4.2 kg" or "8.15 dl".
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Amount {
     /// The quantity.
     pub quantity: Decimal,
@@ -35,7 +34,11 @@ impl Display for Amount {
 }
 
 /// The rating of a product. Will be between 1 and 5.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref, Serialize, Deserialize,
+)]
+#[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
+// TODO: Derive `Deserialize` manually, disallowing out-of-range values.
 pub struct Rating(u8);
 
 impl Rating {
@@ -58,7 +61,9 @@ impl Rating {
 }
 
 /// The average rating of a product. Will be between 1 and 5.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Into, Deref)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Into, Deref, Serialize, Deserialize)]
+#[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
+// TODO: Derive `Deserialize` manually, disallowing out-of-range values.
 pub struct AverageRating(f32);
 
 impl AverageRating {
@@ -98,7 +103,23 @@ impl Display for AverageRating {
 /// A username may contain letters, numbers, underscores and dashes. Furthermore, usernames are
 /// between 3 and 20 characters long. Note that other scripts are allowed, so this does not put
 /// strict limits on byte length.
-#[derive(Debug, Default, Display, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref)]
+#[derive(
+    Debug,
+    Default,
+    Display,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Into,
+    Deref,
+    Serialize,
+    Deserialize,
+)]
+#[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
+// TODO: Derive `Deserialize` manually, disallowing invalid values.
 pub struct Username(Box<str>);
 
 impl Username {
@@ -125,7 +146,7 @@ impl Username {
 }
 
 /// An overview of a product, for display on product cards.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ProductOverview {
     /// The ID of the product.
     pub id: Id<Product>,
@@ -151,7 +172,7 @@ pub struct ProductOverview {
 }
 
 /// Information about a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProductInfo {
     /// The ID of the product.
     pub id: Id<Product>,
@@ -197,7 +218,7 @@ pub struct ProductInfo {
 }
 
 /// A special offer, offering some sort of discount on a product.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ProductSpecialOffer {
     /// Whether the special offer is available only for members.
     pub members_only: bool,
@@ -215,7 +236,7 @@ pub struct ProductSpecialOffer {
 /// This type is unaware of what product it belongs to or its pricing, and is therefore unable to
 /// verify that it actually provides a discount. Nevertheless, attempting to insert such a special
 /// offer into the database will result in an error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SpecialOfferDeal {
     /// The price has been reduced.
     Discount {
@@ -268,7 +289,7 @@ impl SpecialOfferDeal {
 }
 
 /// A category with its subcategories, for display in a tree.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CategoryTree {
     /// The ID of the category.
     pub id: Id<Category>,
@@ -279,14 +300,14 @@ pub struct CategoryTree {
 }
 
 /// A category with its supercategories, for display on product pages, starting from the root.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CategoryPath {
     /// The segments of the path. Each item is a tuple `(id, name)`.
     pub segments: Box<[(Id<Category>, Box<str>)]>,
 }
 
 /// A customer's own review of a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OwnReview {
     /// The ID of the review.
     pub id: Id<Review>,
@@ -307,7 +328,7 @@ pub struct OwnReview {
 }
 
 /// A review of a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ProductReview {
     /// The ID of the review.
     pub id: Id<Review>,
@@ -334,7 +355,7 @@ pub struct ProductReview {
 }
 
 /// A record of a customer's review, for display on profile.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CustomerReviews {
     /// The ID of the product.
     pub product: Id<Product>,
@@ -350,7 +371,7 @@ pub struct CustomerReviews {
     pub content: Box<str>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// A vote on a review or comment.
 pub enum Vote {
     /// The user liked the review/comment. Counts as 1 for tallying.
@@ -360,7 +381,7 @@ pub enum Vote {
 }
 
 /// A comment with its replies, for display in a tree.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CommentTree {
     /// The ID of the comment.
     pub id: Id<Comment>,
@@ -384,7 +405,7 @@ pub struct CommentTree {
 
 /// The role of the user placing a comment. In some cases, a special badge should be displayed by
 /// the comment.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[expect(variant_size_differences, reason = "Difference is neglibile.")]
 pub enum CommentRole {
     /// The author is a user. The original poster of the review should get a badge.
@@ -402,7 +423,7 @@ pub enum CommentRole {
 }
 
 /// A completed order.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Order {
     /// Overview of the product.
     pub product: ProductOverview,

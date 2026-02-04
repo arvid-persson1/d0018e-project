@@ -1,22 +1,27 @@
 //! Rudimentary authentication.
 
+#![allow(clippy::future_not_send, reason = "Violated by the `#[server]` macro.")]
+
 use crate::{
     Id,
     database::{Administrator, Customer, Username, Vendor},
 };
+use dioxus::prelude::*;
+use serde::{Deserialize, Serialize};
 
 // TODO: Move this to `database`?
 
 /// Get information about the currently logged in user, if any.
 #[inline]
-#[must_use]
+#[expect(clippy::missing_errors_doc, reason = "TODO")]
 #[expect(clippy::todo, reason = "TODO")]
-pub fn logged_in() -> Option<Login> {
+#[server]
+pub(crate) async fn logged_in() -> Result<Option<Login>> {
     todo!()
 }
 
 /// Information about a login session.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Login {
     /// The username of the logged in user.
     pub username: Username,
@@ -25,7 +30,7 @@ pub struct Login {
 }
 
 /// A user's role and their ID.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LoginId {
     /// The user is a customer.
     Customer(Id<Customer>),

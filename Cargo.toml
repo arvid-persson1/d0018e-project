@@ -7,7 +7,7 @@ repository = "https://www.github.com/arvid-persson1/d0018e-project"
 version = "0.1.0"
 
 [dependencies]
-chrono = { default-features = false, features = ["std"], version = "0.4.43" }
+chrono = { default-features = false, features = ["serde", "std"], version = "0.4.43" }
 derive_more = { default-features = false, features = [
     "deref",
     "display",
@@ -16,6 +16,10 @@ derive_more = { default-features = false, features = [
 ], version = "2.1.1" }
 dioxus = { features = ["fullstack", "router"], version = "0.7.1" }
 dotenvy = { default-features = false, optional = true, version = "0.15.7" }
+futures = { default-features = false, features = [
+    "executor",
+    "std",
+], optional = true, version = "0.3.31" }
 num-traits = { default-features = false, features = ["std"], version = "0.2.19" }
 regex = { default-features = false, features = [
     "perf",
@@ -23,15 +27,21 @@ regex = { default-features = false, features = [
     "std",
     "unicode-gencat",
 ], version = "1.12.2" }
-rust_decimal = { default-features = false, features = ["std"], version = "1.40.0" }
+rust_decimal = { default-features = false, features = ["serde", "std"], version = "1.40.0" }
+serde = { default-features = false, features = ["alloc", "derive", "std"], version = "1.0.228" }
 sqlx = { default-features = false, features = [
     "macros",
     "postgres",
 ], optional = true, version = "0.8.6" }
+tokio = { default-features = false, features = [
+    "parking_lot",
+    "rt-multi-thread",
+    "sync",
+], optional = true, version = "1.49.0" }
 
 [features]
 default = ["web"]
-server = ["dep:dotenvy", "dep:sqlx", "dioxus/server"]
+server = ["dep:dotenvy", "dep:futures", "dep:sqlx", "dep:tokio", "dioxus/server"]
 web = ["dioxus/web"]
 
 [profile.dev]
@@ -128,7 +138,7 @@ unused_qualifications = "allow"
 # Opposites of checked lints, covered by other lints.
 allow_attributes = "allow"
 self_named_module_files = "allow"
-semicolon_inside_block = "allow"
+semicolon_outside_block = "allow"
 separated_literal_suffix = "allow"
 shadow_reuse = "allow"
 # Core language features and proper use of common APIs.
@@ -199,6 +209,7 @@ unwrap_in_result = "allow"
 multiple_crate_versions = "allow"
 # Poorly implemented.
 cognitive_complexity = "allow"
+redundant_pub_crate = "allow"
 # Many false positives.
 decimal_literal_representation = "allow"
 # Fine to use, but should be allowed with a `reason`. Prefer `expect` over `unwrap`.
@@ -310,13 +321,12 @@ redundant_clone = "deny"
 redundant_closure_for_method_calls = "deny"
 redundant_else = "deny"
 redundant_feature_names = "deny"
-redundant_pub_crate = "deny"
 redundant_test_prefix = "deny"
 redundant_type_annotations = "deny"
 return_and_then = "deny"
 self_only_used_in_recursion = "deny"
 semicolon_if_nothing_returned = "deny"
-semicolon_outside_block = "deny"
+semicolon_inside_block = "deny"
 shadow_same = "deny"
 shadow_unrelated = "deny"
 single_char_pattern = "deny"
