@@ -76,7 +76,7 @@ FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE TABLE customers (
     id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    pfp_url URL,
+    profile_picture URL,
     -- Null: not a member.
     member_since NONFUTURE_TIMESTAMP,
     can_review BOOLEAN NOT NULL DEFAULT TRUE
@@ -84,7 +84,7 @@ CREATE TABLE customers (
 
 CREATE TABLE vendors (
     id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    pfp_url URL,
+    profile_picture URL,
     display_name TEXT NOT NULL,
     description TEXT NOT NULL
 );
@@ -137,8 +137,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
-CREATE TRIGGER users_valid_subclass
+CREATE CONSTRAINT TRIGGER users_valid_subclass
 AFTER INSERT OR UPDATE OF role ON users
+DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION validate_user_subclass();
 
 CREATE FUNCTION validate_user_superclass() RETURNS TRIGGER AS $$
@@ -168,11 +169,15 @@ CREATE FUNCTION validate_user_role_change() RETURNS TRIGGER AS $$
 BEGIN
     -- `id` is generated and so can't be changed.
     CASE OLD.role
-        WHEN 'customer' AND EXISTS (SELECT 1 FROM customers WHERE id = OLD.id) THEN
-            RAISE EXCEPTION 'Must remove customer data to change customer role.';
-        WHEN 'vendor' AND EXISTS (SELECT 1 FROM vendors WHERE id = OLD.id) THEN
-            RAISE EXCEPTION 'Must remove vendor data to change vendor role.';
-        WHEN 'customer', 'vendor', 'administrator' THEN
+        WHEN 'customer' THEN
+            IF EXISTS (SELECT 1 FROM customers WHERE id = OLD.id) THEN
+                RAISE EXCEPTION 'Must remove customer data to change customer role.';
+            END IF;
+        WHEN 'vendor' THEN
+            IF EXISTS (SELECT 1 FROM vendors WHERE id = OLD.id) THEN
+                RAISE EXCEPTION 'Must remove vendor data to change vendor role.';
+            END IF;
+        WHEN 'administrator' THEN
             NULL;
         ELSE
             RAISE WARNING 'Unknown role: %.', NEW.role;
@@ -228,7 +233,7 @@ FOR EACH ROW EXECUTE FUNCTION validate_user_one_subclass();
 
 CREATE TABLE categories (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     parent INT REFERENCES categories(id) ON DELETE CASCADE
 );
 
@@ -267,15 +272,17 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER categories_valid_tree
-BEFORE INSERT OR UPDATE OF parent ON categories
+AFTER INSERT OR UPDATE OF parent ON categories
 FOR EACH ROW EXECUTE FUNCTION categories_validate_tree();
 
 CREATE TABLE products (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name TEXT NOT NULL,
-    thumbnail_url URL NOT NULL,
+    thumbnail URL NOT NULL,
     gallery URL[] NOT NULL,
-    price TWOPOINT_UDEC NOT NULL,
+    -- Domain is NOT restricted to positive values only, as a special offer could for example give
+    -- away a product for free (with limited uses).
+    price TWOPOINT_UDEC NOT NULL CHECK (price > 0),
     overview TEXT NOT NULL,
     description TEXT NOT NULL,
     in_stock UINT NOT NULL DEFAULT 0,
@@ -285,12 +292,16 @@ CREATE TABLE products (
     vendor INT NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
     origin TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TRIGGER products_creation_time
 BEFORE INSERT OR UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION creation_time();
+
+CREATE TRIGGER products_update_time
+BEFORE UPDATE ON products
+FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -300,44 +311,29 @@ CREATE TABLE special_offers (
     valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Null: offer must be removed manually.
     valid_until TIMESTAMP CONSTRAINT end_after_start CHECK (valid_until IS NULL OR valid_until > valid_from),
-    active BOOLEAN NOT NULL DEFAULT TRUE,
 
     -- The lack of sum types is noticeable here. There are three variants:
-    -- 1. "NEW PRICE X" (sale) has `new_price` as X, and both quantities as `NULL`.
-    -- 2. "TAKE M PAY FOR N" has `quantity1` as M, `quantity2` as N and `new_price` as `NULL`.
-    -- 3. "TAKE N PAY X" has `quantity1` as N, `new_price` as X, and `quantity2` as `NULL`.
+    -- 1. "NEW PRICE `new_price`" (sale) has both quantities as `NULL`.
+    -- 2. "TAKE `quantity1` PAY FOR `quantity2`" has `new_price` as `NULL`.
+    -- 3. "TAKE `quantity1` PAY `new_price`" has `quantity2` as `NULL`.
     new_price TWOPOINT_UDEC,
     quantity1 INT CHECK (quantity1 IS NULL OR quantity1 > 1),
-    quantity2 INT CHECK (quantity2 IS NULL OR quantity2 >= 1),
-    CONSTRAINT valid_variant CHECK (
-        (
-            new_price IS NOT NULL
-            AND quantity1 IS NULL
-            AND quantity2 IS NULL
-        ) OR (
-            new_price IS NULL
-            AND quantity1 IS NOT NULL
-            AND quantity2 IS NOT NULL
-            AND quantity1 > quantity2
-            AND quantity2 >= 1
-        ) OR (
-            new_price IS NOT NULL
-            AND quantity1 IS NOT NULL
-            AND quantity1 > 1
-            AND quantity2 IS NULL
-        )
-    )
+    quantity2 INT CHECK (quantity2 IS NULL OR quantity2 >= 1)
 );
 
+CREATE VIEW active_special_offers AS
+SELECT *
+FROM SPECIAL_OFFERS
+WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
+
 -- There is no technical reason why there couldn't be several active special offers: the price
--- calculator would simply have to choose the better price.
+-- calculator would just have to choose the better price.
 CREATE FUNCTION offers_deny_overlap() RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.active AND EXISTS (
+    IF EXISTS (
         SELECT 1
         FROM special_offers
         WHERE id != NEW.id
-        AND active
         AND product = NEW.product
         AND tsrange(valid_from, valid_until, '[)') && tsrange(NEW.valid_from, NEW.valid_until, '[)')
     ) THEN
@@ -349,45 +345,86 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 CREATE TRIGGER offers_no_overlap
-BEFORE INSERT OR UPDATE OF active, product, valid_from, valid_until ON special_offers
+BEFORE INSERT OR UPDATE OF product, valid_from, valid_until ON special_offers
 FOR EACH ROW EXECUTE FUNCTION offers_deny_overlap();
 
-CREATE FUNCTION offers_validate_discount() RETURNS TRIGGER AS $$
+CREATE FUNCTION offers_discount(
+    base_price TWOPOINT_UDEC,
+    new_price TWOPOINT_UDEC,
+    quantity1 INT,
+    quantity2 INT
+) RETURNS DECIMAL AS $$
+DECLARE
+    discount DECIMAL;
 BEGIN
-    -- We allow this invariant to be broken for inactive offers as price changes should be allowed
-    -- for these without restrictions.
-    IF NEW.active AND NEW.new_price / COALESCE(NEW.quantity2, 1) >= (SELECT price FROM products WHERE id = NEW.product)
-    THEN
-        RAISE EXCEPTION 'Special offer must actually result in a discount.';
+    -- Variant 1.
+    IF new_price IS NOT NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
+        IF new_price >= base_price THEN
+            RAISE EXCEPTION 'New price is not less than base price.';
+        END IF;
+        
+        IF base_price = 0 THEN
+            discount := 1;
+        ELSE
+            discount := 1 - new_price / base_price;
+        END IF;
+    -- Variant 2.
+    ELSIF new_price IS NULL AND quantity1 IS NOT NULL AND quantity2 IS NOT NULL THEN
+        IF quantity1 <= 1 THEN
+            RAISE EXCEPTION 'Must be asked to take more than 1.';
+        ELSIF quantity2 < 1 THEN
+            RAISE EXCEPTION 'Must be asked to pay for at least 1.';
+        ELSIF quantity1 <= quantity2 THEN
+            RAISE EXCEPTION 'Must be asked to pay for less than taken.';
+        END IF;
+        discount := 1 - quantity2::TWOPOINT_UDEC / quantity1::TWOPOINT_UDEC;
+    -- Variant 3.
+    ELSIF new_price IS NOT NULL AND quantity1 IS NOT NULL AND quantity2 IS NULL THEN
+        IF quantity1 <= 1 THEN
+            RAISE EXCEPTION 'Must be asked to take more than 1.';
+        ELSIF new_price >= base_price * quantity1 THEN
+            RAISE EXCEPTION 'Must be asked to pay less in bulk.';
+        END IF;
+        
+        IF base_price = 0 THEN
+            discount := 1;
+        ELSE
+            discount := 1 - new_price / (base_price * quantity1);
+        END IF;
+    ELSE
+        RAISE EXCEPTION 'Invalid variant.';
     END IF;
 
+    RETURN discount;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE FUNCTION offers_validate_discount() RETURNS TRIGGER AS $$
+DECLARE
+    base_price TWOPOINT_UDEC;
+BEGIN
+    SELECT price INTO base_price FROM products WHERE id = NEW.product;
+    PERFORM offers_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
-CREATE TRIGGER offers_discount_on_self
-BEFORE INSERT OR UPDATE OF active, new_price, quantity2 ON special_offers
+CREATE TRIGGER offers_valid_discount
+BEFORE INSERT OR UPDATE OF product, new_price, quantity1, quantity2 ON special_offers
 FOR EACH ROW EXECUTE FUNCTION offers_validate_discount();
 
-CREATE FUNCTION offers_validate_discount_price_change() RETURNS TRIGGER AS $$
+CREATE FUNCTION products_validate_discounts() RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.price < OLD.price AND EXISTS (
-        SELECT 1
-        FROM special_offers so
-        WHERE so.active
-        AND so.product = NEW.id
-        AND so.new_price / COALESCE(so.quantity2, 1) >= NEW.price
-    ) THEN
-        RAISE EXCEPTION 'Attempted to lower price under special offer. Consider changing the special offer.';
-    END IF;
-
+    PERFORM offers_discount(NEW.price, new_price, quantity1, quantity2)
+    FROM special_offers so
+    WHERE so.product = NEW.id AND (so.valid_until IS NULL OR so.valid_until > CURRENT_TIMESTAMP);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
-CREATE TRIGGER offers_discount_on_price
-BEFORE UPDATE OF price IN products
-FOR EACH ROW EXECUTE FUNCTION offers_validate_discount_price_change();
+CREATE TRIGGER products_valid_discounts
+BEFORE UPDATE OF price ON products
+FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
 
 -- NOTE: It is possible for a customer to have used a special offer more times than the limit
 -- allows due to the limit having changed. Similarly, it is possible for a non-member to have used
@@ -436,6 +473,8 @@ $$ LANGUAGE sql VOLATILE;
 -- missed. Hence, call this function on establishing a connection to the database. If this is done,
 -- there will be no issues with data integrity as the downage would also prevent orders from being
 -- placed.
+-- Safer alternatives would be to have the database automatically call this at startup (is this
+-- possible?) or to run it on each relevant access to affected tables (is this feasible?).
 SELECT cron.schedule (
     'process_daily_expiries',
     -- Daily at midnight.
@@ -454,14 +493,14 @@ CREATE TABLE ratings (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     rating RATING NOT NULL,
     PRIMARY KEY (product, customer)
-)
+);
 
 CREATE TABLE reviews (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     CONSTRAINT one_review_per_customer_per_product UNIQUE (product, customer),
@@ -473,6 +512,24 @@ CREATE TRIGGER reviews_creation_time
 BEFORE INSERT OR UPDATE ON reviews
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
+CREATE TRIGGER reviews_update_time
+BEFORE UPDATE ON reviews
+FOR EACH ROW EXECUTE FUNCTION update_time();
+
+CREATE FUNCTION reviewer_can_review() RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT (SELECT can_review FROM customers WHERE id = NEW.customer) THEN
+        RAISE EXCEPTION 'Customer must be able to place reviews.';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_reviewer
+BEFORE INSERT OR UPDATE OF customer ON reviews
+FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
+
 CREATE TABLE review_votes (
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -482,10 +539,10 @@ CREATE TABLE review_votes (
 CREATE TABLE comments (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     -- We allow vendors (and administrators) to place comments, for example to respond to critique.
-    user INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- Child comments also have this set for easier queries.
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
@@ -495,6 +552,10 @@ CREATE TABLE comments (
 CREATE TRIGGER comments_creation_time
 BEFORE INSERT OR UPDATE ON comments
 FOR EACH ROW EXECUTE FUNCTION creation_time();
+
+CREATE TRIGGER comments_update_time
+BEFORE UPDATE ON comments
+FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE FUNCTION comment_parent_same_review() RETURNS TRIGGER AS $$
 BEGIN
@@ -528,8 +589,6 @@ BEGIN
         SELECT parent INTO current_parent FROM comments WHERE id = current_id;
         current_id := current_parent;
     END LOOP;
-
-    current.id := start_id;
     
     RETURN NEW;
 END;
@@ -547,15 +606,16 @@ CREATE TABLE comment_votes (
 
 CREATE TABLE shopping_cart_items (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-    -- User should be able to see that an item in their cart has been removed.
+    -- Null: product was deleted since being added to cart. The customer can see that this has
+    -- happened, but not what the product was.
     product INT REFERENCES products(id) ON DELETE SET NULL,
     count POSITIVE_INT NOT NULL,
-    updated_at TIMESTAMP GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED,
-    -- `NULL = NULL` evaluates to `NULL`, which is for this purpose equivalent to false. So this
-    -- (correctly) allows multiple (user, NULL) entries, for when a customer has several deleted
-    -- products in their cart.
-    PRIMARY KEY (customer, product)
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TRIGGER cart_update_time
+BEFORE UPDATE ON shopping_cart_items
+FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE TABLE customer_favorites (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -583,5 +643,3 @@ CREATE TABLE orders (
 );
 
 -- TODO: Indices.
-
-
