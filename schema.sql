@@ -620,8 +620,13 @@ FOR EACH ROW EXECUTE FUNCTION update_time();
 CREATE TABLE customer_favorites (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    favorited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (customer, product)
 );
+
+CREATE TRIGGER favorites_creation_time
+BEFORE INSERT OR UPDATE ON favorites
+FOR EACH ROW EXECUTE FUNCTION creation_time();
 
 CREATE TABLE orders (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
