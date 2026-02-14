@@ -286,10 +286,10 @@ CREATE TABLE products (
     overview TEXT NOT NULL,
     description TEXT NOT NULL,
     in_stock UINT NOT NULL DEFAULT 0,
-    category INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     amount_per_unit AMOUNT,
     visible BOOLEAN NOT NULL DEFAULT TRUE,
     vendor INT NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+    category INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     origin TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -431,8 +431,8 @@ FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
 -- members-only special offer due to the status of the latter having changed. These are not errors
 -- and nothing should be changed about the history, it should only prevent future uses.
 CREATE TABLE special_offer_uses (
-    special_offer INT NOT NULL REFERENCES special_offers(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    special_offer INT NOT NULL REFERENCES special_offers(id) ON DELETE CASCADE,
     number UINT NOT NULL DEFAULT 0,
     PRIMARY KEY (special_offer, customer)
 );
@@ -531,8 +531,8 @@ BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 
 CREATE TABLE review_votes (
-    review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
     grade VOTE NOT NULL,
     PRIMARY KEY (review, customer)
 );
@@ -600,8 +600,8 @@ BEFORE INSERT OR UPDATE OF parent ON comments
 FOR EACH ROW EXECUTE FUNCTION comments_validate_tree();
 
 CREATE TABLE comment_votes (
-    comment INT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    comment INT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
     grade VOTE NOT NULL,
     PRIMARY KEY (comment, customer)
 );
