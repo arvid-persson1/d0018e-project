@@ -533,7 +533,8 @@ FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 CREATE TABLE review_votes (
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-    grade VOTE NOT NULL
+    grade VOTE NOT NULL,
+    PRIMARY KEY (review, customer)
 );
 
 CREATE TABLE comments (
