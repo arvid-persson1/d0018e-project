@@ -546,7 +546,7 @@ CREATE TABLE comments (
 
     -- Child comments also have this set for easier queries.
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
-    parent INT REFERENCES comments(id) ON DELETE CASCADE
+    parent INT DEFAULT NULL REFERENCES comments(id) ON DELETE CASCADE
 );
 
 CREATE TRIGGER comments_creation_time
@@ -601,7 +601,8 @@ FOR EACH ROW EXECUTE FUNCTION comments_validate_tree();
 CREATE TABLE comment_votes (
     comment INT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-    grade VOTE NOT NULL
+    grade VOTE NOT NULL,
+    PRIMARY KEY (comment, customer)
 );
 
 CREATE TABLE shopping_cart_items (
