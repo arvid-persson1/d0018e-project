@@ -433,7 +433,7 @@ FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
 CREATE TABLE special_offer_uses (
     special_offer INT NOT NULL REFERENCES special_offers(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-    count UINT NOT NULL DEFAULT 0,
+    number UINT NOT NULL DEFAULT 0,
     PRIMARY KEY (special_offer, customer)
 );
 
@@ -457,14 +457,14 @@ CREATE FUNCTION process_expiries() RETURNS void AS $$
         RETURNING product, amount
     ),
     counts AS (
-        SELECT product, SUM(amount) as count
+        SELECT product, SUM(amount) as number
         FROM processed
         GROUP BY product
     )
     UPDATE products
     -- We accept that there might have "disappeared" products due to manual intervention. Maybe some
     -- units arrived with broken packaging.
-    SET in_stock = GREATEST(0, products.in_stock - counts.count)
+    SET in_stock = GREATEST(0, products.in_stock - counts.number)
     FROM counts
     WHERE products.id = counts.product;
 $$ LANGUAGE sql VOLATILE;
@@ -610,7 +610,7 @@ CREATE TABLE shopping_cart_items (
     -- Null: product was deleted since being added to cart. The customer can see that this has
     -- happened, but not what the product was.
     product INT REFERENCES products(id) ON DELETE SET NULL,
-    count POSITIVE_INT NOT NULL,
+    number POSITIVE_INT NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT one_item_per_customer_per_product UNIQUE (customer, product)
 );
@@ -644,7 +644,7 @@ CREATE TABLE orders (
     -- At the time of purchase.
     price TWOPOINT_UDEC NOT NULL,
     amount_per_unit AMOUNT,
-    count POSITIVE_INT NOT NULL,
+    number POSITIVE_INT NOT NULL,
 
     time NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
