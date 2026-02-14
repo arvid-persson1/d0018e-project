@@ -489,16 +489,16 @@ SELECT cron.schedule (
 -- to reviews and comments, as they might want to answer questions or clear up confusions.
 
 CREATE TABLE ratings (
-    product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     rating RATING NOT NULL,
     PRIMARY KEY (product, customer)
 );
 
 CREATE TABLE reviews (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     title TEXT NOT NULL,
