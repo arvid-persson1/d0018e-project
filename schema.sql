@@ -642,10 +642,15 @@ CREATE TABLE orders (
     -- proper audit logging is important, the product table needs a redesign.
     product INT REFERENCES products(id) ON DELETE SET NULL,
 
-    -- At the time of purchase.
-    price TWOPOINT_UDEC NOT NULL,
-    amount_per_unit AMOUNT,
+    -- A more strict history could be maintained. For example, it might be desirable to store a
+    -- copy of the deal from the special offers used (or at least the discount), and basic
+    -- information in the case that the product is deleted.
+
     number POSITIVE_INT NOT NULL,
+    paid TWOPOINT_UDEC NOT NULL,
+    special_offer_used BOOLEAN NOT NULL,
+    -- At the time of purchase.
+    amount_per_unit AMOUNT,
 
     time NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
