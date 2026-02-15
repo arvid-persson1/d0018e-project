@@ -24,7 +24,7 @@ CREATE DOMAIN RATING AS INT CHECK (VALUE BETWEEN 1 AND 5);
 CREATE DOMAIN URL AS TEXT;
 
 CREATE TYPE AMOUNT AS (
-    value DECIMAL(10, 2) NOT NULL,
+    value TWOPOINT_UDEC NOT NULL,
     unit TEXT
 );
 
@@ -238,7 +238,7 @@ CREATE TABLE categories (
 );
 
 CREATE TYPE category_path_segment AS (id INT NOT NULL, name TEXT NOT NULL);
-CREATE FUNCTION category_path(start_id INT) RETURNS category_path_segment[] AS $$
+CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[] AS $$
 DECLARE
     path category_path_segment[] := ARRAY[]::category_path_segment[];
     current categories%ROWTYPE;
@@ -307,6 +307,7 @@ CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     members_only BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Measured in number of batches (per unit if there is no concept of a batch).
     limit_per_customer POSITIVE_INT,
     valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Null: offer must be removed manually.
@@ -349,13 +350,13 @@ BEFORE INSERT OR UPDATE OF product, valid_from, valid_until ON special_offers
 FOR EACH ROW EXECUTE FUNCTION offers_deny_overlap();
 
 CREATE FUNCTION offers_discount(
-    base_price TWOPOINT_UDEC,
-    new_price TWOPOINT_UDEC,
-    quantity1 INT,
-    quantity2 INT
-) RETURNS DECIMAL AS $$
+    base_price products.price%TYPE,
+    new_price special_offers.new_price%TYPE,
+    quantity1 special_offers.quantity1%TYPE,
+    quantity2 special_offers.quantity2%TYPE
+) RETURNS TWOPOINT_UDEC AS $$
 DECLARE
-    discount DECIMAL;
+    discount TWOPOINT_UDEC;
 BEGIN
     -- Variant 1.
     IF new_price IS NOT NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
@@ -401,7 +402,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE FUNCTION offers_validate_discount() RETURNS TRIGGER AS $$
 DECLARE
-    base_price TWOPOINT_UDEC;
+    base_price products.price%TYPE;
 BEGIN
     SELECT price INTO base_price FROM products WHERE id = NEW.product;
     PERFORM offers_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2);
@@ -442,7 +443,7 @@ CREATE TABLE special_offer_uses (
 CREATE TABLE expiries (
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     expiry DATE NOT NULL,
-    amount POSITIVE_INT NOT NULL,
+    number POSITIVE_INT NOT NULL,
     -- Null: not processed yet.
     processed_at NONFUTURE_TIMESTAMP CONSTRAINT processed_after_expiry CHECK (processed_at >= expiry)
 );
@@ -454,17 +455,17 @@ CREATE FUNCTION process_expiries() RETURNS void AS $$
         UPDATE expiries
         SET processed_at = CURRENT_TIMESTAMP
         WHERE expiry <= CURRENT_DATE AND processed_at IS NULL
-        RETURNING product, amount
+        RETURNING product, number
     ),
     counts AS (
-        SELECT product, SUM(amount) as number
+        SELECT product, SUM(number) AS total
         FROM processed
         GROUP BY product
     )
     UPDATE products
     -- We accept that there might have "disappeared" products due to manual intervention. Maybe some
     -- units arrived with broken packaging.
-    SET in_stock = GREATEST(0, products.in_stock - counts.number)
+    SET in_stock = GREATEST(0, products.in_stock - counts.total)
     FROM counts
     WHERE products.id = counts.product;
 $$ LANGUAGE sql VOLATILE;
@@ -530,6 +531,7 @@ CREATE TRIGGER validate_reviewer
 BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 
+-- TODO: Disallow voting on own review.
 CREATE TABLE review_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
@@ -599,6 +601,7 @@ CREATE TRIGGER comments_valid_tree
 BEFORE INSERT OR UPDATE OF parent ON comments
 FOR EACH ROW EXECUTE FUNCTION comments_validate_tree();
 
+-- TODO: Disallow voting on own comments.
 CREATE TABLE comment_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     comment INT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
