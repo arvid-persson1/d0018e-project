@@ -66,28 +66,11 @@ fn App() -> Element {
 fn main() {
     #[cfg(feature = "server")]
     {
-        use database::{CONNECTION, startup};
+        use database::init_connection;
         use futures::executor::block_on;
-        use sqlx::PgPool as Pool;
 
         let database_url = dotenvy::var("DATABASE_URL").expect("`DATABASE_URL` not set.");
-        block_on(async {
-            #[expect(
-                clippy::unwrap_used,
-                reason = "Main function runs first, so this will be the first to initialize the cell."
-            )]
-            CONNECTION
-                .set(
-                    Pool::connect(&database_url)
-                        .await
-                        .expect("Failed to establish a connection to the database"),
-                )
-                .unwrap();
-
-            startup()
-                .await
-                .expect("Failed to run startup code in database.");
-        });
+        block_on(init_connection(database_url));
     }
 
     launch(App);

@@ -20,7 +20,12 @@ futures = { default-features = false, features = [
     "executor",
     "std",
 ], optional = true, version = "0.3.31" }
-num-traits = { default-features = false, features = ["std"], version = "0.2.19" }
+hashbrown = { default-features = false, features = [
+    "alloc",
+    "default-hasher",
+    "inline-more",
+    "nightly",
+], optional = true, version = "0.16.1" }
 regex = { default-features = false, features = [
     "perf",
     "perf-dfa-full",
@@ -32,6 +37,7 @@ serde = { default-features = false, features = ["alloc", "derive", "std"], versi
 sqlx = { default-features = false, features = [
     "macros",
     "postgres",
+    "rust_decimal",
 ], optional = true, version = "0.8.6" }
 tokio = { default-features = false, features = [
     "parking_lot",
@@ -41,7 +47,7 @@ tokio = { default-features = false, features = [
 
 [features]
 default = ["web"]
-server = ["dep:dotenvy", "dep:futures", "dep:sqlx", "dep:tokio", "dioxus/server"]
+server = ["dep:dotenvy", "dep:futures", "dep:hashbrown", "dep:sqlx", "dep:tokio", "dioxus/server"]
 web = ["dioxus/web"]
 
 [profile.dev]

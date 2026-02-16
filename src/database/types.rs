@@ -3,13 +3,13 @@
 use super::{Category, Comment, Id, Product, Review, Vendor};
 use chrono::NaiveDateTime;
 use derive_more::{Deref, Display, Into};
-use num_traits::cast::ToPrimitive as _;
 use regex::Regex;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "server")]
+use sqlx::Type;
 use std::{
     fmt::{Display, Error as FmtError, Formatter},
-    num::NonZeroU32,
     sync::LazyLock,
 };
 
@@ -17,7 +17,11 @@ use std::{
 pub type Url = Box<str>;
 
 /// Quantity of a product along with unit, e.g. "4.2 kg" or "8.15 dl".
+///
+/// This type is oblivious to any actual meaning behind the units, so it can't for example handle
+/// conversions.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(Type))]
 pub struct Amount {
     /// The quantity.
     pub quantity: Decimal,
@@ -35,7 +39,7 @@ impl Display for Amount {
 
 /// The rating of a product. Will be between 1 and 5.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref, Serialize, Deserialize,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Into, Deref, Serialize, Deserialize,
 )]
 #[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
 // TODO: Derive `Deserialize` manually, disallowing out-of-range values.
@@ -60,17 +64,33 @@ impl Rating {
     }
 }
 
-/// The average rating of a product. Will be between 1 and 5.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Into, Deref, Serialize, Deserialize)]
+/// The average rating of a product (between 1 and 5), as well as the number of ratings
+/// contributing to that score.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
 // TODO: Derive `Deserialize` manually, disallowing out-of-range values.
-pub struct AverageRating(f32);
+pub struct AverageRating {
+    /// The average rating, unspecified if `count` is 0.
+    rating: f32,
+    /// The number of ratings contributing to the score.
+    count: u32,
+}
 
 impl AverageRating {
     /// Verifies the rating is in range and constructs an `AverageRating` on success.
     #[inline]
-    pub fn new(r: f32) -> Option<Self> {
-        Some(r).filter(|r| (1. ..=5.).contains(r)).map(Self)
+    #[must_use]
+    pub fn new(rating: f32, count: u32) -> Option<Self> {
+        if count == 0 {
+            Some(Self {
+                rating: 0.,
+                count: 0,
+            })
+        } else if (1. ..=5.).contains(&rating) {
+            Some(Self { rating, count })
+        } else {
+            None
+        }
     }
 
     /// Constructs an `AverageRating` without verifying range.
@@ -80,8 +100,26 @@ impl AverageRating {
     /// Must ensure `1 <= r <= 5`.
     #[inline]
     #[must_use]
-    pub const unsafe fn new_unchecked(r: f32) -> Self {
-        Self(r)
+    pub const unsafe fn new_unchecked(rating: f32, count: u32) -> Self {
+        Self { rating, count }
+    }
+
+    /// Returns the average rating if there are any.
+    #[inline]
+    #[must_use]
+    pub const fn rating(self) -> Option<f32> {
+        if self.count > 0 {
+            Some(self.rating)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the number of ratings.
+    #[inline]
+    #[must_use]
+    pub const fn count(self) -> u32 {
+        self.count
     }
 }
 
@@ -89,8 +127,12 @@ impl Display for AverageRating {
     /// Formats the rating with a single decimal point.
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        let Self(r) = self;
-        write!(f, "{r:.1}")
+        let Self { rating, count } = *self;
+        if count > 0 {
+            write!(f, "No ratings")
+        } else {
+            write!(f, "{rating:.1}")
+        }
     }
 }
 
@@ -146,7 +188,7 @@ impl Username {
 }
 
 /// An overview of a product, for display on product cards.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductOverview {
     /// The ID of the product.
     pub id: Id<Product>,
@@ -167,8 +209,10 @@ pub struct ProductOverview {
     pub vendor_name: Box<str>,
     /// The origin of the product. This may or may not be the name of a country.
     pub origin: Box<str>,
-    /// The currently active special offer on the product, if any.
-    pub special_offer: Option<ProductSpecialOffer>,
+    /// The currently active special offer on the product, if any. This is a tuple
+    /// `(deal, members_only)` where `members_only` indicates whether the special offer is
+    /// available only to members.
+    pub special_offer: Option<(Deal, bool)>,
 }
 
 /// Information about a product, for display on product pages.
@@ -180,10 +224,6 @@ pub struct ProductInfo {
     pub name: Box<str>,
     /// URLs to images of the product.
     pub gallery: Box<[Url]>,
-    /// URL to the image meant to be displayed on product cards. This image should not be displayed
-    /// with those from [`gallery`](Self::gallery), but can be used as a fallback if the gallery is
-    /// empty.
-    pub thumbnail: Url,
     /// The price of the product before any discounts.
     pub price: Decimal,
     /// A long description of the product.
@@ -211,24 +251,10 @@ pub struct ProductInfo {
     pub updated_at: NaiveDateTime,
     /// The average rating of the product.
     pub rating: AverageRating,
-    /// The currently active special offer on the product, if any.
-    pub special_offer: Option<ProductSpecialOffer>,
-    /// The customer's own review of the product, if any.
-    pub own_review: Option<OwnReview>,
-}
-
-/// A special offer, offering some sort of discount on a product.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct ProductSpecialOffer {
-    /// Whether the special offer is available only for members.
-    pub members_only: bool,
-    /// The limit of how many times each customer can get a discount from this offer, if any.
-    pub limit_per_customer: Option<NonZeroU32>,
-    /// End of the special offer, if any. Note that the start time is omitted, but is implied to be
-    /// some time before now since the special offer was fetched.
-    pub valid_until: Option<NaiveDateTime>,
-    /// What the offer entails.
-    pub deal: SpecialOfferDeal,
+    /// The currently active special offer on the product, if any. This is a tuple
+    /// `(deal, members_only)` where `members_only` indicates whether the special offer is
+    /// available only to members.
+    pub special_offer: Option<(Deal, bool)>,
 }
 
 /// Details on the discount of a special offer.
@@ -236,8 +262,8 @@ pub struct ProductSpecialOffer {
 /// This type is unaware of what product it belongs to or its pricing, and is therefore unable to
 /// verify that it actually provides a discount. Nevertheless, attempting to insert such a special
 /// offer into the database will result in an error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum SpecialOfferDeal {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Deal {
     /// The price has been reduced.
     Discount {
         /// The new price of the product.
@@ -259,29 +285,100 @@ pub enum SpecialOfferDeal {
     },
 }
 
-impl SpecialOfferDeal {
+/// Errors created by [`SpecialOfferDeal::new`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpecialOfferDealError {
+    /// The arguments did not represent a valid type of special offer.
+    InvalidVariant,
+    /// The deal did not actually provide a discount. The deal is given anyway in case this was
+    /// expected.
+    NoDiscount(Deal),
+}
+
+impl Deal {
+    /// Constructs a new `Deal` from the format used in the database.
+    ///
+    /// The following variants exists:
+    /// 1. "NEW PRICE X" (sale) has `new_price` as <code>[Some]\(X)</code>, and both quantities as
+    ///    [`None`].
+    /// 2. "TAKE M PAY FOR N" has `quantity1` as <code>[Some]\(M)</code>, `quantity2` as
+    ///    <code>[Some]\(N)</code> and `new_price` as [`None`].
+    /// 3. "TAKE N PAY X" has `quantity1` as <code>[Some]\(N)</code>, `new_price` as
+    ///    <code>[Some]\(X)</code>, and `quantity2` as [`None`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidVariant`](SpecialOfferDeal::InvalidVariant) if none of the above cases
+    /// match, or [`NoDiscount`](SpecialOfferDeal::NoDiscount) if the deal is structurally valid
+    /// but does not actually provide a discount compared to the price of the product.
+    ///
+    /// Silently overflows if either quantity is [`Some`] and negative.
+    #[inline]
+    pub fn new(
+        new_price: Option<Decimal>,
+        quantity1: Option<i32>,
+        quantity2: Option<i32>,
+        base_price: Decimal,
+    ) -> Result<Option<Self>, SpecialOfferDealError> {
+        let deal = match (new_price, quantity1, quantity2) {
+            (Some(new_price), None, None) => Self::Discount { new_price },
+            (None, Some(take), Some(pay_for)) => Self::Batch {
+                take: take as u32,
+                pay_for: pay_for as u32,
+            },
+            (Some(pay), Some(take), None) => Self::BatchPrice {
+                pay,
+                take: take as u32,
+            },
+            (None, None, None) => return Ok(None),
+            _ => return Err(SpecialOfferDealError::InvalidVariant),
+        };
+        if deal.discount_average(base_price).is_some() {
+            Ok(Some(deal))
+        } else {
+            Err(SpecialOfferDealError::NoDiscount(deal))
+        }
+    }
+
+    /// Converts a `Deal` into the format used in the database.
+    ///
+    /// Specifically, this returns a tuple representing the columns  `new_price`, `quantity1` and
+    /// `quantity2` respectively on success. If either quantity is greater than `i32::MAX`, `None`
+    /// is returned.
+    pub fn database_repr(self) -> Option<(Option<Decimal>, Option<i32>, Option<i32>)> {
+        match self {
+            Self::Discount { new_price } => Some((Some(new_price), None, None)),
+            Self::Batch { take, pay_for }
+                if let Ok(take) = take.try_into()
+                    && let Ok(pay_for) = pay_for.try_into() =>
+            {
+                Some((None, Some(take), Some(pay_for)))
+            },
+            Self::BatchPrice { take, pay } if let Ok(take) = take.try_into() => {
+                Some((Some(pay), Some(take), None))
+            },
+            Self::Batch { .. } | Self::BatchPrice { .. } => None,
+        }
+    }
+
     /// Calculates the discount in percent as average per unit. If the deal doesn't actually offer
     /// a price reduction, `None` is returned.
     #[inline]
     #[must_use]
-    pub fn discount_average(self, base_price: Decimal) -> Option<f32> {
+    pub fn discount_average(self, base_price: Decimal) -> Option<Decimal> {
         match self {
-            Self::Discount { new_price }
-                if new_price < base_price
-                    && let Some(factor) = (new_price / base_price).to_f32() =>
-            {
-                Some(1. - factor)
+            Self::Discount { new_price } if new_price < base_price => {
+                Some(Decimal::ONE - new_price / base_price)
             },
             Self::Batch { take, pay_for } if take > pay_for => {
-                Some(1. - pay_for as f32 / take as f32)
+                Some(Decimal::ONE - Decimal::from(pay_for) / Decimal::from(take))
             },
             Self::BatchPrice { take, pay }
                 if take > 1
-                    && let Some(pay) = pay.to_f32()
-                    && let Some(base_price) = base_price.to_f32()
-                    && pay * (take as f32) < base_price =>
+                    && let take = Decimal::from(take)
+                    && pay * take < base_price =>
             {
-                Some(1. - pay / (base_price * take as f32))
+                Some(Decimal::ONE - pay / (base_price * take))
             },
             Self::Discount { .. } | Self::Batch { .. } | Self::BatchPrice { .. } => None,
         }
@@ -289,14 +386,14 @@ impl SpecialOfferDeal {
 }
 
 /// A category with its subcategories, for display in a tree.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CategoryTree {
     /// The ID of the category.
     pub id: Id<Category>,
     /// The name of the category.
     pub name: Box<str>,
     /// All direct subcategories.
-    pub subcategories: Box<[Self]>,
+    pub subcategories: Vec<Self>,
 }
 
 /// A category with its supercategories, for display on product pages, starting from the root.
@@ -307,7 +404,7 @@ pub struct CategoryPath {
 }
 
 /// A customer's own review of a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OwnReview {
     /// The ID of the review.
     pub id: Id<Review>,
@@ -328,7 +425,7 @@ pub struct OwnReview {
 }
 
 /// A review of a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductReview {
     /// The ID of the review.
     pub id: Id<Review>,
@@ -355,8 +452,8 @@ pub struct ProductReview {
 }
 
 /// A record of a customer's review, for display on profile.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CustomerReviews {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomerReview {
     /// The ID of the product.
     pub product: Id<Product>,
     /// URL to an image of the product.
@@ -371,7 +468,7 @@ pub struct CustomerReviews {
     pub content: Box<str>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A vote on a review or comment.
 pub enum Vote {
     /// The user liked the review/comment. Counts as 1 for tallying.
@@ -381,7 +478,7 @@ pub enum Vote {
 }
 
 /// A comment with its replies, for display in a tree.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommentTree {
     /// The ID of the comment.
     pub id: Id<Comment>,
@@ -405,7 +502,7 @@ pub struct CommentTree {
 
 /// The role of the user placing a comment. In some cases, a special badge should be displayed by
 /// the comment.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[expect(variant_size_differences, reason = "Difference is neglibile.")]
 pub enum CommentRole {
     /// The author is a user. The original poster of the review should get a badge.
@@ -422,15 +519,45 @@ pub enum CommentRole {
     Administrator,
 }
 
+/// A record of a customer's purchase.
+///
+/// This does not include a timestamp, as they are intended to be grouped by timestamp in an
+/// [`Order`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Purchase {
+    /// How much was paid.
+    pub paid: Decimal,
+    /// Whether a special offer affected the price.
+    pub special_offer_used: bool,
+    /// How much of the product was included in one unit at the time of purchase.
+    pub amount_per_unit: Amount,
+    /// How many units were purchased.
+    pub number: u32,
+    /// The name of the product.
+    pub product_name: Box<str>,
+    /// URL to an image of the product.
+    pub thumbnail: Url,
+    // TODO: Some of these fields might not be used in the frontend and should then be removed.
+    /// A short description of the proudct,
+    pub product_overview: Box<str>,
+    /// The origin of the product. This may or may not be the name of a country.
+    pub product_origin: Box<str>,
+    /// The name of the vendor.
+    pub vendor_name: Box<str>,
+}
+
 /// A completed order.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Order {
-    /// Overview of the product.
-    pub product: ProductOverview,
-    /// Total price of the order (not per product) at the time of purchase.
-    pub price: Decimal,
-    /// Amount per unit at the time of purchase.
-    pub amount_per_unit: Option<Amount>,
-    /// Number of units in the order.
-    pub count: u32,
+    /// The time of purchase.
+    pub time: NaiveDateTime,
+    /// Purchases included in this order.
+    pub purchases: Box<[Purchase]>,
+}
+
+impl Order {
+    /// Calculcates the total price of all purchases in the order.
+    pub fn price(&self) -> Decimal {
+        self.purchases.iter().map(|purchase| purchase.paid).sum()
+    }
 }

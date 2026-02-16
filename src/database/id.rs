@@ -9,6 +9,9 @@ use std::{
     str::FromStr,
 };
 
+/// The type internally used in the database to represent IDs.
+pub type Inner = i32;
+
 /// Type-safe ID used as primary key in database queries.
 ///
 /// An ID is considered *valid* if a row exists in the corresponding table in the database with the
@@ -19,16 +22,16 @@ use std::{
 /// likely invalid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // FIXME: `PhantomData` may be overly restrictive here when considering variance.
-pub struct Id<T: Key + ?Sized>(i32, PhantomData<T>);
+pub struct Id<T: Key + ?Sized>(Inner, PhantomData<T>);
 
-impl<T: Key> From<i32> for Id<T> {
+impl<T: Key> From<Inner> for Id<T> {
     #[inline]
-    fn from(value: i32) -> Self {
+    fn from(value: Inner) -> Self {
         Self(value, PhantomData)
     }
 }
 
-impl<T: Key> From<Id<T>> for i32 {
+impl<T: Key> From<Id<T>> for Inner {
     #[inline]
     fn from(value: Id<T>) -> Self {
         let Id(i, _) = value;

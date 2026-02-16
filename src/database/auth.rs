@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 // TODO: Move this to `database`?
 
 /// Get information about the currently logged in user, if any.
-#[inline]
 #[expect(clippy::missing_errors_doc, reason = "TODO")]
 #[expect(clippy::todo, reason = "TODO")]
 #[server]
@@ -21,7 +20,7 @@ pub(crate) async fn logged_in() -> Result<Option<Login>> {
 }
 
 /// Information about a login session.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Login {
     /// The username of the logged in user.
     pub username: Username,
@@ -30,7 +29,7 @@ pub struct Login {
 }
 
 /// A user's role and their ID.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LoginId {
     /// The user is a customer.
     Customer(Id<Customer>),
