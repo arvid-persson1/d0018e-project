@@ -2,6 +2,8 @@ use dioxus::prelude::*;
 use crate::Route;
 use crate::state::GlobalState;
 
+// Class for the category navigation bar
+
 #[component]
 fn SidebarCategory(title: String, subcategories: Vec<String>) -> Element {
     let mut is_open = use_signal(|| false);
