@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::state::GlobalState;
-use crate::views::{Home, CustomerProfile, VendorProfile, Product, Category, Administration};
+use crate::views::{Administration, Category, CustomerProfile, Home, Product, VendorProfile};
 
 use crate::components::navbar::Navbar;
 mod state;
@@ -40,11 +40,12 @@ fn main() {
 
 #[component]
 fn MainApp() -> Element {
-    
-    use_context_provider(|| Signal::new(GlobalState { 
-        cart_count: 0, 
-        fav_count: 0 
-    }));
+    use_context_provider(|| {
+        Signal::new(GlobalState {
+            cart_count: 0,
+            fav_count: 0,
+        })
+    });
 
     rsx! {
         script { src: "https://cdn.tailwindcss.com" }
@@ -56,4 +57,3 @@ fn MainApp() -> Element {
         Router::<Route> {}
     }
 }
-

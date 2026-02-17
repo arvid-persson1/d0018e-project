@@ -1,6 +1,6 @@
-use dioxus::prelude::*;
-use crate::state::GlobalState;
 use crate::Route;
+use crate::state::GlobalState;
+use dioxus::prelude::*;
 // class for a product card
 #[derive(Props, Clone, PartialEq)]
 pub struct ProductProps {
@@ -21,7 +21,11 @@ pub fn ProductCard(props: ProductProps) -> Element {
     let formatted_price = format!("{:.2}", props.price).replace('.', ",");
     let formatted_comparison = props.comparison_price.replace('.', ",");
 
-    let heart_class = if is_favorite() { "text-red-500" } else { "text-gray-400 hover:text-red-500" };
+    let heart_class = if is_favorite() {
+        "text-red-500"
+    } else {
+        "text-gray-400 hover:text-red-500"
+    };
 
     rsx! {
         div { class: "bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition p-4 flex flex-col gap-3 relative",

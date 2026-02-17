@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::components::productCard::ProductCard; 
+use crate::components::productCard::ProductCard;
 use crate::fakeData::getFakeProducts;
 
 // Class for the home page

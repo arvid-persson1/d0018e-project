@@ -1,8 +1,8 @@
-use dioxus::prelude::*;
 use crate::Route;
-use crate::state::GlobalState;
-use crate::fakeData::{getFakeProducts, ProductInfo};
 use crate::components::productCard::ProductCard;
+use crate::fakeData::{ProductInfo, getFakeProducts};
+use crate::state::GlobalState;
+use dioxus::prelude::*;
 
 // Class for product page
 #[component]
@@ -19,19 +19,47 @@ pub fn Product(id: i32) -> Element {
 
     // Hämta in produkt data
     let products = getFakeProducts();
-    let product = products.iter().find(|p| p.id == id).cloned().unwrap_or(products[0].clone());
+    let product = products
+        .iter()
+        .find(|p| p.id == id)
+        .cloned()
+        .unwrap_or(products[0].clone());
 
     // Prisformatering
     let formatted_price = format!("{:.2}", product.price).replace('.', ",");
     let formatted_jfr = product.comparison_price.replace('.', ",");
-    let heart_class = if is_favorite() { "text-red-500" } else { "text-gray-400 hover:text-red-500" };
+    let heart_class = if is_favorite() {
+        "text-red-500"
+    } else {
+        "text-gray-400 hover:text-red-500"
+    };
 
     // Klass för betyg stjärnor
-    let s1 = if selected_rating() >= 1 { "text-yellow-400" } else { "text-gray-300" };
-    let s2 = if selected_rating() >= 2 { "text-yellow-400" } else { "text-gray-300" };
-    let s3 = if selected_rating() >= 3 { "text-yellow-400" } else { "text-gray-300" };
-    let s4 = if selected_rating() >= 4 { "text-yellow-400" } else { "text-gray-300" };
-    let s5 = if selected_rating() >= 5 { "text-yellow-400" } else { "text-gray-300" };
+    let s1 = if selected_rating() >= 1 {
+        "text-yellow-400"
+    } else {
+        "text-gray-300"
+    };
+    let s2 = if selected_rating() >= 2 {
+        "text-yellow-400"
+    } else {
+        "text-gray-300"
+    };
+    let s3 = if selected_rating() >= 3 {
+        "text-yellow-400"
+    } else {
+        "text-gray-300"
+    };
+    let s4 = if selected_rating() >= 4 {
+        "text-yellow-400"
+    } else {
+        "text-gray-300"
+    };
+    let s5 = if selected_rating() >= 5 {
+        "text-yellow-400"
+    } else {
+        "text-gray-300"
+    };
 
     rsx! {
         div { class: "max-w-6xl mx-auto p-4 md:p-8 bg-white",
