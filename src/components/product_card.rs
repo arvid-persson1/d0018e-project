@@ -14,13 +14,6 @@ pub struct ProductProps {
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
-    let items_in_cart = global_state
-        .read()
-        .cart_items
-        .iter()
-        .filter(|&&id| id == props.id)
-        .count();
-
     // kollar favorit
     let is_favorite = global_state.read().favorites.contains(&props.id);
 
@@ -63,7 +56,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
             div { class: "flex items-center gap-2 mt-auto",
                 if global_state.read().cart_items.iter().filter(|&&id| id == props.id).count() == 0 {
                     button {
-                        class: "flex-grow bg-green-700 text-white font-bold py-2 rounded-full",
+                        class: "flex-grow bg-green-700 text-white font-bold py-2 rounded-full hover:bg-green-800 transition flex justify-center items-center gap-2",
                         onclick: move |_| {
                             global_state.write().cart_items.push(product_id);
                         },
