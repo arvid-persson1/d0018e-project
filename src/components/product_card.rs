@@ -1,6 +1,7 @@
 use crate::Route;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
+
 // class for a product card
 #[derive(Props, Clone, PartialEq)]
 pub struct ProductProps {
@@ -14,6 +15,7 @@ pub struct ProductProps {
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
+
     // kollar favorit
     let is_favorite = global_state.read().favorites.contains(&props.id);
 
@@ -61,7 +63,6 @@ pub fn ProductCard(props: ProductProps) -> Element {
                             global_state.write().cart_items.push(product_id);
                         },
                         i { class: "fas fa-shopping-cart" }
-                   
                     }
                 } else {
                     div { class: "flex-grow flex items-center justify-between bg-green-100 rounded-full overflow-hidden",
@@ -75,11 +76,10 @@ pub fn ProductCard(props: ProductProps) -> Element {
                             },
                             i { class: "fas fa-minus" }
                         }
+
                         span { class: "font-bold text-green-900",
                             "{global_state.read().cart_items.iter().filter(|&&id| id == props.id).count()}"
                         }
-
-                        //a bug
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
