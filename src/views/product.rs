@@ -12,6 +12,13 @@ pub fn Product(id: i32) -> Element {
     let product_id = id;
     let nav = use_navigator();
 
+    let cart_count = global_state
+        .read()
+        .cart_items
+        .iter()
+        .filter(|&&item_id| item_id == id)
+        .count();
+
     // Recension signal
     let mut text_val = use_signal(|| "".to_string());
     let mut selected_rating = use_signal(|| 0);
@@ -117,7 +124,7 @@ pub fn Product(id: i32) -> Element {
                                     global_state.write().cart_items.push(id);
                                 },
                                 i { class: "fa-solid fa-cart-plus" }
-                                                        //"LÄGG I VARUKORG"
+                                "LÄGG I VARUKORG"
                             }
                         } else {
                             div { class: "flex-grow h-full flex items-center justify-between bg-green-100 rounded-full overflow-hidden border-2 border-green-700",
