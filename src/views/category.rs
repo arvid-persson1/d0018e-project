@@ -89,10 +89,25 @@ pub fn Category(id: i32) -> Element {
                                         }
                                     }
 
+
+
+                                    // Vänster pil
+
+                                    // Produktslider
+
+                                    // loopa maxsteg
+                                    // TODO(db): ProductCard är samma, bara datan ändras
+
+                                    // etikett i slutet av scrollningen
+                                    // "Visa hela sortimentet" kort i slutet
+
+                                    // Höger pil
+
+                                    // Dot-indikator
+                                    // grid läge för när man är i enskild kategori
                                     if id == 0 {
                                         div { class: "relative group",
 
-                                            // Vänster pil
                                             if current_pos > 0 && total_cards > 4 {
                                                 button {
                                                     class: "absolute -left-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
@@ -101,16 +116,13 @@ pub fn Category(id: i32) -> Element {
                                                 }
                                             }
 
-                                            // Produktslider
                                             div { class: "overflow-hidden",
                                                 div {
                                                     class: "flex transition-transform duration-700 ease-in-out",
                                                     style: "transform: translateX(-{offset}%);",
 
-                                                    // loopa maxsteg
                                                     for p in cat_products.iter().take(11) {
                                                         div { class: "min-w-full md:min-w-[25%] p-2",
-                                                            // TODO(db): ProductCard är samma, bara datan ändras
                                                             ProductCard {
                                                                 id: p.id,
                                                                 name: p.name.clone(),
@@ -121,7 +133,6 @@ pub fn Category(id: i32) -> Element {
                                                         }
                                                     }
 
-                                                    // etikett i slutet av scrollningen
                                                     if total_cards == 0 {
                                                         div { class: "min-w-full md:min-w-[25%] p-2",
                                                             div { class: "h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 min-h-[380px]",
@@ -132,7 +143,6 @@ pub fn Category(id: i32) -> Element {
                                                             }
                                                         }
                                                     } else {
-                                                        // "Visa hela sortimentet" kort i slutet
                                                         div { class: "min-w-full md:min-w-[25%] p-2",
                                                             Link { to: Route::Category { id: cat_id },
                                                                 div { class: "h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:bg-green-100 transition-all min-h-[380px]",
@@ -147,7 +157,6 @@ pub fn Category(id: i32) -> Element {
                                                 }
                                             }
 
-                                            // Höger pil
                                             if current_pos < max_steps - 1 && total_cards > 4 {
                                                 button {
                                                     class: "absolute -right-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
@@ -156,7 +165,6 @@ pub fn Category(id: i32) -> Element {
                                                 }
                                             }
 
-                                            // Dot-indikator
                                             if total_cards > 4 {
                                                 div { class: "flex justify-center items-center gap-3 mt-8",
                                                     for i in 0..max_steps {
@@ -169,7 +177,6 @@ pub fn Category(id: i32) -> Element {
                                             }
                                         }
                                     } else {
-                                        // grid läge för när man är i enskild kategori
                                         div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
                                             for p in cat_products {
                                                 ProductCard {
