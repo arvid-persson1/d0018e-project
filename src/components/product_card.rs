@@ -78,6 +78,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
                             "{global_state.read().cart_items.iter().filter(|&&id| id == props.id).count()}"
                         }
 
+                        //a bug
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
