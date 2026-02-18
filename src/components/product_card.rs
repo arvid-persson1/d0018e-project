@@ -1,8 +1,10 @@
-use dioxus::prelude::*;
+use crate::Route;
 use crate::state::GlobalState;
-// class for5 a product card
+use dioxus::prelude::*;
+// class for a product card
 #[derive(Props, Clone, PartialEq)]
 pub struct ProductProps {
+    pub id: i32,
     pub name: String,
     pub price: f64,
     pub image_url: String,
@@ -15,26 +17,40 @@ pub fn ProductCard(props: ProductProps) -> Element {
     let mut is_favorite = use_signal(|| false);
     let mut global_state = use_context::<Signal<GlobalState>>();
 
-    let heart_class = if is_favorite() { "text-red-500" } else { "text-gray-400 hover:text-red-500" };
+    // Pris format
+    let formatted_price = format!("{:.2}", props.price).replace('.', ",");
+    let formatted_comparison = props.comparison_price.replace('.', ",");
+
+    let heart_class = if is_favorite() {
+        "text-red-500"
+    } else {
+        "text-gray-400 hover:text-red-500"
+    };
 
     rsx! {
         div { class: "bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition p-4 flex flex-col gap-3 relative",
 
-            img {
-                src: "{props.image_url}",
-                class: "w-full h-60 w-30 object-contain mb-2",
+            // länk i bilden för produktsidan
+            Link { to: Route::Product { id: props.id },
+                img {
+                    src: "{props.image_url}",
+                    class: "w-full h-60 object-contain mb-2 cursor-pointer hover:opacity-80 transition",
+                }
             }
 
             div { class: "flex flex-col gap-0.5",
-                h3 { class: "font-bold text-lg text-gray-800", "{props.name}" }
+                // länk i namnet för produktsidan
+                Link { to: Route::Product { id: props.id },
+                    h3 { class: "font-bold text-lg text-gray-800 hover:text-green-700 cursor-pointer",
+                        "{props.name}"
+                    }
+                }
 
-                // för specialerbjudande
-                //p { class: "text-2xl font-black text-red-600", "{props.price} kr" }
-                p { class: "text-2xl font-black text-black-600", "{props.price} kr" }
-
-                p { class: "text-gray-500 text-xs font-medium", "Jfr pris {props.comparison_price}" }
+                p { class: "text-2xl font-black text-black-600", "{formatted_price} kr" }
+                p { class: "text-gray-500 text-xs font-medium", "Jfr pris {formatted_comparison}" }
             }
 
+            // Köpknapp och favoritknapp
             div { class: "flex items-center gap-2 mt-auto",
                 if count() == 0 {
                     button {
@@ -44,7 +60,6 @@ pub fn ProductCard(props: ProductProps) -> Element {
                             global_state.write().cart_count += 1;
                         },
                         i { class: "fas fa-shopping-cart" }
-                    
                     }
                 } else {
                     div { class: "flex-grow flex items-center justify-between bg-green-100 rounded-full overflow-hidden",

@@ -1,7 +1,5 @@
 //! Shared views.
 
-
-
 mod home;
 pub use home::Home;
 

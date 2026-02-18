@@ -1,10 +1,9 @@
 //! Shared components.
 
 pub mod echo;
-pub mod productCard; 
 pub mod navbar;
+pub mod product_card;
 
-
-pub use echo::Echo;
-pub use productCard::ProductCard;
-pub use navbar::Navbar;
+//pub use echo::Echo;
+//pub use navbar::Navbar;
+//pub use product_card::ProductCard;
