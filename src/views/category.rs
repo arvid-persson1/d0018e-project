@@ -89,22 +89,29 @@ pub fn Category(id: i32) -> Element {
                                         }
                                     }
 
+                        // Vänster pil
+
+                        // Produktslider
+
+                        // loopa maxsteg
+                        // TODO(db): ProductCard är samma, bara datan ändras
+
+                        // etikett i slutet av scrollningen
+                        // "Visa hela sortimentet" kort i slutet
+
+                        // Höger pil
+
+                        // Dot-indikator
+                        // grid läge för när man är i enskild kategori
 
 
-                                    // Vänster pil
 
-                                    // Produktslider
 
-                                    // loopa maxsteg
-                                    // TODO(db): ProductCard är samma, bara datan ändras
 
-                                    // etikett i slutet av scrollningen
-                                    // "Visa hela sortimentet" kort i slutet
 
-                                    // Höger pil
 
-                                    // Dot-indikator
-                                    // grid läge för när man är i enskild kategori
+
+
                                     if id == 0 {
                                         div { class: "relative group",
 
