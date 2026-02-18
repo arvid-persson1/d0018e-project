@@ -12,13 +12,6 @@ pub fn Product(id: i32) -> Element {
     let product_id = id;
     let nav = use_navigator();
 
-    let cart_count = global_state
-        .read()
-        .cart_items
-        .iter()
-        .filter(|&&item_id| item_id == id)
-        .count();
-
     // Recension signal
     let mut text_val = use_signal(|| "".to_string());
     let mut selected_rating = use_signal(|| 0);
@@ -117,14 +110,14 @@ pub fn Product(id: i32) -> Element {
 
                     // Varukorg knappen
                     div { class: "flex gap-4 items-center h-16",
-                        if cart_count == 0 {
+                        if global_state.read().cart_items.iter().filter(|&&item_id| item_id == id).count() == 0 {
                             button {
                                 class: "flex-grow h-full bg-green-700 text-white rounded-full font-black text-xl hover:bg-green-800 transition-colors shadow-md flex items-center justify-center gap-3",
                                 onclick: move |_| {
                                     global_state.write().cart_items.push(id);
                                 },
                                 i { class: "fa-solid fa-cart-plus" }
-                                "LÄGG I VARUKORG"
+                                                        //"LÄGG I VARUKORG"
                             }
                         } else {
                             div { class: "flex-grow h-full flex items-center justify-between bg-green-100 rounded-full overflow-hidden border-2 border-green-700",
@@ -138,8 +131,9 @@ pub fn Product(id: i32) -> Element {
                                     },
                                     i { class: "fas fa-minus" }
                                 }
-
-                                span { class: "font-black text-2xl text-green-900", "{cart_count}" }
+                                span { class: "font-black text-2xl text-green-900",
+                                    "{global_state.read().cart_items.iter().filter(|&&item_id| item_id == id).count()}"
+                                }
 
                                 button {
                                     class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
