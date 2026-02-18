@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::state::GlobalState;
-use crate::views::{Administration, Category, CustomerProfile, Home, Product, VendorProfile};
+use crate::views::{Administration, Category, CustomerProfile, Home, Product, VendorProfile, Favorites};
 
 use crate::components::navbar::Navbar;
 mod state;
@@ -22,6 +22,8 @@ enum Route {
     #[layout(Navbar)]
         #[route("/")]
         Home {},
+        #[route("/favorites")]
+        Favorites {},
         #[route("/profile")]
         CustomerProfile {},
         #[route("/vendor/:id")]
@@ -43,7 +45,7 @@ fn MainApp() -> Element {
     use_context_provider(|| {
         Signal::new(GlobalState {
             cart_count: 0,
-            fav_count: 0,
+            favorites: Vec::new(), // Initiera som en tom lista
         })
     });
 

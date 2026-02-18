@@ -146,11 +146,13 @@ pub fn Product(id: i32) -> Element {
                         button {
                             class: "h-full px-6 border-2 border-gray-200 rounded-full transition-all {heart_class}",
                             onclick: move |_| {
-                                is_favorite.toggle();
-                                if is_favorite() {
-                                    global_state.write().fav_count += 1;
+                                let mut state = global_state.write();
+                                let current_id = id; // 'id' kommer från rutten #[route("/product/:id")]
+
+                                if state.favorites.contains(&current_id) {
+                                    state.favorites.retain(|&x| x != current_id);
                                 } else {
-                                    global_state.write().fav_count -= 1;
+                                    state.favorites.push(current_id);
                                 }
                             },
                             if is_favorite() {

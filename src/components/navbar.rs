@@ -38,7 +38,10 @@ fn SidebarCategory(title: String, subcategories: Vec<String>) -> Element {
 #[component]
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
+
     let global_state = use_context::<Signal<GlobalState>>();
+
+    let fav_count = global_state.read().favorites.len();
 
     rsx! {
 
@@ -49,7 +52,9 @@ pub fn Navbar() -> Element {
                     div { class: "container mx-auto flex items-center justify-between gap-4",
 
                         // Logga
-                        div { class: "bg-green-900 px-4 py-1 rounded-lg border border-green-600 shadow-inner flex items-center justify-center",
+                        Link {
+                            to: Route::Home {},
+                            class: "bg-green-900 px-4 py-1 rounded-lg border border-green-600 shadow-inner flex items-center justify-center hover:bg-green-800 transition-colors cursor-pointer",
                             span { class: "text-3xl font-black italic tracking-tighter text-white",
                                 "boop"
                             }
@@ -76,13 +81,16 @@ pub fn Navbar() -> Element {
 
                         div { class: "flex items-center gap-6",
                             // favoriter
-                            div { class: "relative flex flex-col items-center hover:text-green-200 cursor-pointer transition",
+                            Link {
+                                to: Route::Favorites {},
+                                class: "relative flex flex-col items-center hover:text-green-200 cursor-pointer transition",
                                 i { class: "fa-solid fa-heart text-2xl" }
                                 span { class: "text-[10px] font-bold uppercase", "Favoriter" }
 
-                                if global_state().fav_count > 0 {
+                                // ANVÄND DIN NYA VARIABEL HÄR:
+                                if fav_count > 0 {
                                     span { class: "absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center border-2 border-green-700",
-                                        "{global_state().fav_count}"
+                                        "{fav_count}"
                                     }
                                 }
                             }
