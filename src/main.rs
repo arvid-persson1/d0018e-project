@@ -1,7 +1,9 @@
 use dioxus::prelude::*;
 
 use crate::state::GlobalState;
-use crate::views::{Administration, Category, CustomerProfile, Home, Product, VendorProfile, Favorites};
+use crate::views::{
+    Administration, Category, CustomerProfile, Favorites, Home, Product, VendorProfile,
+};
 
 use crate::components::navbar::Navbar;
 mod state;

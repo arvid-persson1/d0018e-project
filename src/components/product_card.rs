@@ -31,7 +31,6 @@ pub fn ProductCard(props: ProductProps) -> Element {
         "text-gray-400 hover:text-red-500"
     };
 
-
     rsx! {
         div { class: "bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition p-4 flex flex-col gap-3 relative",
 

@@ -1,14 +1,14 @@
-use dioxus::prelude::*;
-use crate::state::GlobalState;
-use crate::fake_data::get_fake_products;
-use crate::components::product_card::ProductCard;
 use crate::Route;
+use crate::components::product_card::ProductCard;
+use crate::fake_data::get_fake_products;
+use crate::state::GlobalState;
+use dioxus::prelude::*;
 
 #[component]
 pub fn Favorites() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
     let products = get_fake_products();
-    
+
     // Vi filtrerar din fake-data så vi bara får de som finns i favorites-listan
     let fav_items: Vec<_> = products
         .into_iter()
