@@ -181,7 +181,7 @@ pub fn Product(id: i32) -> Element {
 
             // Recensioner
             div { class: "max-w-3xl",
-                h2 { class: "text-2xl font-black mb-8", "Vad tycker andra kunder?" }
+                h2 { class: "text-2xl font-black mb-8", "Recensioner" }
                 div { class: "bg-green-50 p-6 rounded-2xl mb-10 border border-green-100",
                     h3 { class: "font-bold text-lg mb-4 text-green-900", "Skriv en recension" }
 
@@ -231,6 +231,24 @@ pub fn Product(id: i32) -> Element {
                             println!("Betyg: {}", selected_rating());
                         },
                         "Skicka recension"
+                    }
+                }
+                // TEST-RECENSION (Här lägger vi till exemplet)
+                div { class: "space-y-6",
+                    div { class: "border-b pb-6",
+                        div { class: "flex gap-1 mb-2",
+                            // Hur mycket betyg har getts... i detta fall 5/5
+                            for _ in 0..5 {
+                                i { class: "fa-solid fa-star text-yellow-400 text-sm" }
+                            }
+                        }
+                        div { class: "flex items-center gap-2 mb-2",
+                            span { class: "font-bold text-gray-900", "Namn Efternamn" }
+                            span { class: "text-gray-400 text-sm", "• Verifierat köp" }
+                        }
+                        p { class: "text-gray-600 leading-relaxed",
+                            "Här är en exempel recension för att veta hur den ska se ut :))"
+                        }
                     }
                 }
             }
