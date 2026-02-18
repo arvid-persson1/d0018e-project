@@ -18,6 +18,7 @@ pub fn Product(id: i32) -> Element {
     let max_chars = 300;
 
     // Hämta in produkt data
+    // TODO(db): Ersätt get_fake_products() + find med ett API-anrop per produkt
     let products = get_fake_products();
     let product = products
         .iter()
@@ -85,6 +86,7 @@ pub fn Product(id: i32) -> Element {
                         }
                     }
                     // Betyg under bilden
+                    // TODO(db): Hämta snittbetyg och antal recensioner från databasen
                     div { class: "mt-6 flex flex-col items-center gap-2",
                         div { class: "flex text-yellow-400 text-xl",
                             for _ in 0..4 {
@@ -92,7 +94,8 @@ pub fn Product(id: i32) -> Element {
                             }
                             i { class: "fa-regular fa-star" }
                         }
-                        // x av 5 där x är medel-betyget
+                        // hårdkodad betyg: x av 5 där x är medel-betyget
+                        // TODO(db): Ersätt med riktiga värden från databasen
                         span { class: "text-gray-500 text-sm font-medium", "4 av 5 (x recensioner)" }
                     }
                 }
@@ -109,6 +112,7 @@ pub fn Product(id: i32) -> Element {
                     }
 
                     // Varukorg knappen
+                    // TODO(db): cart_items ska sparas i databasen istället för GlobalState
                     div { class: "flex gap-4 items-center h-16",
                         if global_state.read().cart_items.iter().filter(|&&item_id| item_id == id).count() == 0 {
                             button {
@@ -146,6 +150,7 @@ pub fn Product(id: i32) -> Element {
                         }
 
                         // favorit knapp
+                        // TODO(db): Favoriter ska sparas i databasen per användare istället för GlobalStat
                         button {
                             class: "h-full px-6 border-2 border-gray-200 rounded-full transition-all {heart_class}",
                             onclick: move |_| {
@@ -167,10 +172,12 @@ pub fn Product(id: i32) -> Element {
             }
 
             // Liknande produkter
+            // TODO(db): Ersätt med en query som hämtar produkter med samma category_id
             div { class: "border-t pt-16 mb-16",
                 h2 { class: "text-3xl font-black mb-8 text-gray-900", "Liknande produkter" }
                 div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6",
                     for p in products.iter().filter(|p| p.id != id).take(4) {
+                        // TODO(db): ProductCard är samma, bara datan ändras
                         ProductCard {
                             id: p.id,
                             name: p.name.clone(),
@@ -227,6 +234,7 @@ pub fn Product(id: i32) -> Element {
                     }
 
                     // Skicka in recension knapp, aktiveras inte föränn man har satt betyg!
+                    // TODO(db): Skicka recension (text_val + selected_rating) till databasen kopplat till produkt-id och inloggad användare
                     button {
                         class: "bg-green-700 text-white px-8 py-3 rounded-full font-bold hover:bg-green-800 transition shadow-sm disabled:opacity-30 disabled:cursor-not-allowed",
                         disabled: selected_rating() == 0,
@@ -236,16 +244,19 @@ pub fn Product(id: i32) -> Element {
                         "Skicka recension"
                     }
                 }
-                // EXEMPEL
+                // HÅRDKODAD EXEMPEL
+                // TODO(db): Ersätt med hämtade recensioner från databasen
                 div { class: "space-y-6",
                     div { class: "border-b pb-6",
                         div { class: "flex gap-1 mb-2",
                             // Hur mycket betyg har getts... i detta fall 5/5
+                            // TODO(db): Loopa stjärnor baserat på recensionens betyg från databasen
                             for _ in 0..5 {
                                 i { class: "fa-solid fa-star text-yellow-400 text-sm" }
                             }
                         }
                         div { class: "flex items-center gap-2 mb-2",
+                            // TODO(db): Ersätt namn med användarnamn från databasen
                             span { class: "font-bold text-gray-900", "Namn Efternamn" }
                             span { class: "text-gray-400 text-sm", "• Verifierat köp" }
                         }

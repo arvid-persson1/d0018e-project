@@ -4,9 +4,10 @@ use crate::components::product_card::ProductCard;
 use crate::fake_data::get_fake_products;
 
 // Class for the home page
-
 #[component]
 pub fn Home() -> Element {
+    // TODO(db): Ersätt get_fake_products() med ett API-anrop
+    // TODO(db): Lägg till paginering eller lazy-loading när produktmängd växer
     let products = get_fake_products();
 
     rsx! {
@@ -21,6 +22,7 @@ pub fn Home() -> Element {
 
                     // loopa genom produkterna som läggs till
                     for p in products.iter() {
+                        // TODO(db): ProductCard är samma, bara datan ändras
                         ProductCard {
                             id: p.id,
                             name: p.name.clone(),

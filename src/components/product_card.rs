@@ -17,6 +17,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
 
     // kollar favorit
+    // TODO(db): Favoriter ska hämtas från databasen per inloggad användare istället för GlobalState
     let is_favorite = global_state.read().favorites.contains(&props.id);
 
     let product_id = props.id;
@@ -55,11 +56,13 @@ pub fn ProductCard(props: ProductProps) -> Element {
             }
 
             // Köpknapp och favoritknapp
+            // TODO(db): cart_items ska sparas i databasen istället för GlobalState
             div { class: "flex items-center gap-2 mt-auto",
                 if global_state.read().cart_items.iter().filter(|&&id| id == props.id).count() == 0 {
                     button {
                         class: "flex-grow bg-green-700 text-white font-bold py-2 rounded-full hover:bg-green-800 transition flex justify-center items-center gap-2",
                         onclick: move |_| {
+                            // TODO(db): Ersätt med ett API-anrop som lägger till produkten i köparens varukorg
                             global_state.write().cart_items.push(product_id);
                         },
                         i { class: "fas fa-shopping-cart" }
@@ -69,6 +72,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
+                                // TODO(db): Ersätt med ett API-anrop som tar bort produkten från köparens varukorg
                                 let mut state = global_state.write();
                                 if let Some(pos) = state.cart_items.iter().position(|&x| x == product_id) {
                                     state.cart_items.remove(pos);
@@ -82,6 +86,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
+                                // TODO(db): Ersätt med ett API-anrop som ökar antal i varukorgen
                                 global_state.write().cart_items.push(product_id);
                             },
                             i { class: "fas fa-plus" }
@@ -90,6 +95,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
                 }
 
                 // Favoritknapp
+                // TODO(db): Ersätt med API-anrop
                 button {
                     class: "p-2 transition-colors {heart_class} text-xl",
                     onclick: move |_| {
