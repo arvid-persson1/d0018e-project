@@ -20,7 +20,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -29,7 +30,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -38,7 +40,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -47,7 +50,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -56,7 +60,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -65,7 +70,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -74,7 +80,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -83,7 +90,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -92,7 +100,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -101,7 +110,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -110,7 +120,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -119,7 +130,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -128,7 +140,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -137,7 +150,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -146,7 +160,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -155,7 +170,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -164,7 +180,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -173,7 +190,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -182,7 +200,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -191,7 +210,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -200,7 +220,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -209,7 +230,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 1".to_string(),
             price: 24.90,
             comparison_price: "55 kr/kg".to_string(),
-            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1571771894821-ad996211fdf4?w=500"
+                .to_string(),
             description: "beskrvining".to_string(),
             category_id: 2, // Frukt & Grönt
         },
@@ -218,7 +240,8 @@ pub fn get_fake_products() -> Vec<ProductInfo> {
             name: "test produkt 2".to_string(),
             price: 18.50,
             comparison_price: "30 kr/l".to_string(),
-            image_url: "https://images.unsplash.com/photo-1563636619-e910ef49e9cf?w=500".to_string(),
+            image_url: "https://images.unsplash.com/photo-1563636619-e910ef49e9cf?w=500"
+                .to_string(),
             description: "beskrivning".to_string(),
             category_id: 1, // Mejeri
         },

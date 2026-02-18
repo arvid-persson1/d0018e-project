@@ -1,7 +1,7 @@
-use dioxus::prelude::*;
+use crate::Route;
 use crate::components::product_card::ProductCard;
 use crate::fake_data::get_fake_products;
-use crate::Route;
+use dioxus::prelude::*;
 
 // A page for categorys
 
@@ -9,7 +9,7 @@ use crate::Route;
 pub fn Category(id: i32) -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop eller databas-query
     let products = get_fake_products();
-    
+
     let scroll_pos_1 = use_signal(|| 0);
     let scroll_pos_2 = use_signal(|| 0);
     let scroll_pos_3 = use_signal(|| 0);

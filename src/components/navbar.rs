@@ -44,7 +44,7 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<String>) -> Elemen
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
     let global_state = use_context::<Signal<GlobalState>>();
-    
+
     // TODO(db): fav_count och cart_total borde hämtas från databasen per inloggad användare istället för GlobalState
     let fav_count = global_state.read().favorites.len();
     let cart_total = global_state.read().cart_items.len();
