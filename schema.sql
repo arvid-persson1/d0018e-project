@@ -23,11 +23,6 @@ CREATE DOMAIN RATING AS INT CHECK (VALUE BETWEEN 1 AND 5);
 -- TODO: Improve URL representation or replace entirely (server storage).
 CREATE DOMAIN URL AS TEXT;
 
-CREATE TYPE AMOUNT AS (
-    value TWOPOINT_UDEC NOT NULL,
-    unit TEXT
-);
-
 CREATE TYPE VOTE AS ENUM ('like', 'dislike');
 
 CREATE TYPE ROLE AS ENUM ('customer', 'vendor', 'administrator');
@@ -237,7 +232,7 @@ CREATE TABLE categories (
     parent INT REFERENCES categories(id) ON DELETE CASCADE
 );
 
-CREATE TYPE category_path_segment AS (id INT NOT NULL, name TEXT NOT NULL);
+CREATE TYPE CATEGORY_PATH_SEGMENT AS (id INT, name TEXT);
 CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[] AS $$
 DECLARE
     path category_path_segment[] := ARRAY[]::category_path_segment[];
@@ -286,13 +281,17 @@ CREATE TABLE products (
     overview TEXT NOT NULL,
     description TEXT NOT NULL,
     in_stock UINT NOT NULL DEFAULT 0,
-    amount_per_unit AMOUNT,
     visible BOOLEAN NOT NULL DEFAULT TRUE,
     vendor INT NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
     category INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     origin TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    amount_per_unit TWOPOINT_UDEC NOT NULL DEFAULT 1,
+    -- Null: discrete amount.
+    measurement_unit TEXT,
+    CONSTRAINT valid_without_unit CHECK (measurement_unit IS NOT NULL OR amount_per_unit % 1 = 0)
 );
 
 CREATE TRIGGER products_creation_time
@@ -450,7 +449,7 @@ CREATE TABLE expiries (
 
 CREATE FUNCTION process_expiries() RETURNS void AS $$
     -- Key doesn't matter as long as it's unique.
-    WITH lock AS (SELECT pg_advisory_xact_lock(hashtextextended('process_expiries'))),
+    WITH lock AS (SELECT pg_advisory_xact_lock(hashtextextended('process_expiries', 0))),
     processed AS (
         UPDATE expiries
         SET processed_at = CURRENT_TIMESTAMP
@@ -549,6 +548,7 @@ CREATE TABLE comments (
 
     -- Child comments also have this set for easier queries.
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+    -- Null: belongs to review directly.
     parent INT DEFAULT NULL REFERENCES comments(id) ON DELETE CASCADE
 );
 
@@ -626,12 +626,12 @@ FOR EACH ROW EXECUTE FUNCTION update_time();
 CREATE TABLE customer_favorites (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    favorited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (customer, product)
 );
 
 CREATE TRIGGER favorites_creation_time
-BEFORE INSERT OR UPDATE ON favorites
+BEFORE INSERT OR UPDATE ON customer_favorites
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
 CREATE TABLE orders (
@@ -644,6 +644,7 @@ CREATE TABLE orders (
     -- as deleting it. The important part, that being the user and the price, is still kept. If
     -- proper audit logging is important, the product table needs a redesign.
     product INT REFERENCES products(id) ON DELETE SET NULL,
+    time NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- A more strict history could be maintained. For example, it might be desirable to store a
     -- copy of the deal from the special offers used (or at least the discount), and basic
@@ -653,9 +654,10 @@ CREATE TABLE orders (
     paid TWOPOINT_UDEC NOT NULL,
     special_offer_used BOOLEAN NOT NULL,
     -- At the time of purchase.
-    amount_per_unit AMOUNT,
-
-    time NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    amount_per_unit TWOPOINT_UDEC NOT NULL DEFAULT 1,
+    -- Null: discrete amount.
+    measurement_unit TEXT,
+    CONSTRAINT valid_without_unit CHECK (measurement_unit IS NOT NULL OR amount_per_unit % 1 = 0)
 );
 
 -- TODO: Indices.
