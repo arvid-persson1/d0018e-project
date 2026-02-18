@@ -14,14 +14,17 @@ pub struct ProductProps {
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut count = use_signal(|| 0);
-    let mut is_favorite = use_signal(|| false);
     let mut global_state = use_context::<Signal<GlobalState>>();
+
+    // läser favorit direkt (bool ej funktion)
+    let is_favorite = global_state.read().favorites.contains(&props.id);
+    let product_id = props.id;
 
     // Pris format
     let formatted_price = format!("{:.2}", props.price).replace('.', ",");
     let formatted_comparison = props.comparison_price.replace('.', ",");
 
-    let heart_class = if is_favorite() {
+    let heart_class = if is_favorite {
         "text-red-500"
     } else {
         "text-gray-400 hover:text-red-500"
@@ -83,17 +86,18 @@ pub fn ProductCard(props: ProductProps) -> Element {
                     }
                 }
 
+                // Favoritknapp
                 button {
                     class: "p-2 transition-colors {heart_class} text-xl",
                     onclick: move |_| {
-                        is_favorite.toggle();
-                        if is_favorite() {
-                            global_state.write().fav_count += 1;
+                        let mut state = global_state.write();
+                        if state.favorites.contains(&product_id) {
+                            state.favorites.retain(|&x| x != product_id);
                         } else {
-                            global_state.write().fav_count -= 1;
+                            state.favorites.push(product_id);
                         }
                     },
-                    if is_favorite() {
+                    if is_favorite {
                         i { class: "fa-solid fa-heart" }
                     } else {
                         i { class: "fa-regular fa-heart" }

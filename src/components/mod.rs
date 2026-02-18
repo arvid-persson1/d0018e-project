@@ -6,4 +6,3 @@ pub mod product_card;
 
 //pub use echo::Echo;
 //pub use navbar::Navbar;
-//pub use product_card::ProductCard;
