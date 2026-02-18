@@ -2,8 +2,8 @@
 
 pub mod echo;
 pub mod navbar;
-pub mod productCard;
+pub mod product_card;
 
-pub use echo::Echo;
-pub use navbar::Navbar;
-pub use productCard::ProductCard;
+//pub use echo::Echo;
+//pub use navbar::Navbar;
+//pub use product_card::ProductCard;

@@ -9,7 +9,7 @@ mod state;
 mod components;
 mod views;
 
-mod fakeData;
+mod fake_data;
 
 /// Structure of internal routes in our app. Each variant represents a different URL pattern that
 /// can be matched by the router. If that pattern is matched, the components for that route will be

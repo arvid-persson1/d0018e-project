@@ -1,4 +1,4 @@
-use dioxus::prelude::*;
+//use dioxus::prelude::*;
 
 // Class for mock Product to test with
 
@@ -12,7 +12,7 @@ pub struct ProductInfo {
     pub description: String,
 }
 
-pub fn getFakeProducts() -> Vec<ProductInfo> {
+pub fn get_fake_products() -> Vec<ProductInfo> {
     vec![
         ProductInfo {
             id: 1,

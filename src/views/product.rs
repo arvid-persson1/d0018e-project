@@ -1,6 +1,6 @@
 use crate::Route;
-use crate::components::productCard::ProductCard;
-use crate::fakeData::{ProductInfo, getFakeProducts};
+use crate::components::product_card::ProductCard;
+use crate::fake_data::get_fake_products;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
@@ -18,7 +18,7 @@ pub fn Product(id: i32) -> Element {
     let max_chars = 300;
 
     // Hämta in produkt data
-    let products = getFakeProducts();
+    let products = get_fake_products();
     let product = products
         .iter()
         .find(|p| p.id == id)

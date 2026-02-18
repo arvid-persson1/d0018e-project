@@ -1,13 +1,13 @@
 use dioxus::prelude::*;
 
-use crate::components::productCard::ProductCard;
-use crate::fakeData::getFakeProducts;
+use crate::components::product_card::ProductCard;
+use crate::fake_data::get_fake_products;
 
 // Class for the home page
 
 #[component]
 pub fn Home() -> Element {
-    let products = getFakeProducts();
+    let products = get_fake_products();
 
     rsx! {
         div { class: "min-h-screen bg-gray-50",
@@ -20,13 +20,13 @@ pub fn Home() -> Element {
                 div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
 
                     // loopa genom produkterna som läggs till
-                    for p in products {
+                    for p in products.iter() {
                         ProductCard {
                             id: p.id,
-                            name: p.name,
+                            name: p.name.clone(),
                             price: p.price,
-                            comparison_price: p.comparison_price,
-                            image_url: p.image_url,
+                            comparison_price: p.comparison_price.clone(),
+                            image_url: p.image_url.clone(),
                         }
                     }
                 }
