@@ -233,6 +233,24 @@ pub fn Product(id: i32) -> Element {
                         "Skicka recension"
                     }
                 }
+                // EXEMPEL
+                div { class: "space-y-6",
+                    div { class: "border-b pb-6",
+                        div { class: "flex gap-1 mb-2",
+                            // Hur mycket betyg har getts... i detta fall 5/5
+                            for _ in 0..5 {
+                                i { class: "fa-solid fa-star text-yellow-400 text-sm" }
+                            }
+                        }
+                        div { class: "flex items-center gap-2 mb-2",
+                            span { class: "font-bold text-gray-900", "Namn Efternamn" }
+                            span { class: "text-gray-400 text-sm", "• Verifierat köp" }
+                        }
+                        p { class: "text-gray-600 leading-relaxed",
+                            "Här är en exempel recension för att veta hur den ska se ut :))"
+                        }
+                    }
+                }
             }
         }
     }
