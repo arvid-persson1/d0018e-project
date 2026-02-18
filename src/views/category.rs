@@ -24,10 +24,9 @@ pub fn Category(id: i32) -> Element {
     ];
 
     rsx! {
-
         div { class: "container mx-auto p-6 flex flex-col md:flex-row gap-8 min-h-screen",
 
-            // side bar för alla kategorier
+            // side bar för kategorier
             aside { class: "w-full md:w-64 flex-shrink-0",
                 div { class: "sticky top-24 bg-white p-4 rounded-lg shadow-sm border border-gray-100",
                     h2 { class: "text-xl font-bold border-b pb-4 mb-4", "Kategorier" }
@@ -38,7 +37,6 @@ pub fn Category(id: i32) -> Element {
                             class: if id == 0 { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
                             "Visa alla kategorier"
                         }
-                        // Loopar alla kategorier och skapar en länk per kategori
                         for (cat_id , name , _pos) in categories.clone() {
                             Link {
                                 to: Route::Category { id: cat_id },
@@ -51,27 +49,26 @@ pub fn Category(id: i32) -> Element {
             }
 
             main { class: "flex-grow overflow-hidden",
-                // Rubrik visas bara på "Visa alla"-sidan
+                // Rubrik
                 if id == 0 {
-                    h1 { class: "text-4xl font-black mb-8 text-gray-900", "Våra Kategorier" }
+                    h1 { class: "text-4xl font-black mb-8 text-gray-900", "Kategorier" }
                 }
 
-                // räkna ut steg för scrollning av kategorier
+                // räkna ut steg för scrollning
                 for (cat_id , cat_name , mut pos) in categories {
                     if id == 0 || id == cat_id {
                         {
                             let current_pos = *pos.read();
                             let offset = current_pos * 100;
-                            // TODO(db): Ersätt med en query som hämtar produkter filtrerade per
+                            // TODO(db): Ersätt med en query som hämtar produkter filtrerade per category_id
                             let cat_products: Vec<_> = products
-
                                 .iter()
                                 .filter(|p| p.category_id == cat_id)
                                 .collect();
-                            // Antal produkter
+                            // Antal produkter, max 12 st
                             let total_cards = cat_products.iter().take(12).count();
-                            // Antal sidor i slidern, varje sida visar 4 produkter
-                            let max_steps = if total_cards > 4 { (total_cards + 3) / 4 } else { 1 };
+                            // Antal sidor i slider, visar 4 produkter
+                            let max_steps = if total_cards > 4 { total_cards.div_ceil(4) } else { 1 };
                             rsx! {
                                 div { class: "mb-20",
                                     div { class: "flex justify-between items-center mb-6",
@@ -80,7 +77,7 @@ pub fn Category(id: i32) -> Element {
                                             span { class: "w-2 h-8 bg-green-700 rounded-full block" }
                                             "{cat_name}"
                                         }
-                                        // "Visa alla" knapp till
+                                        // Visa allt knapp
                                         Link {
                                             to: Route::Category { id: cat_id },
                                             class: "flex items-center gap-2 text-green-700 font-bold hover:text-green-800 transition-colors bg-green-50 px-4 py-2 rounded-full text-sm",
@@ -89,29 +86,27 @@ pub fn Category(id: i32) -> Element {
                                         }
                                     }
 
-                        // Vänster pil
 
-                        // Produktslider
+                                    // Slider
 
-                        // loopa maxsteg
-                        // TODO(db): ProductCard är samma, bara datan ändras
+                                    // Vänster pil
+                                    // har mer än 4 produkter
 
-                        // etikett i slutet av scrollningen
-                        // "Visa hela sortimentet" kort i slutet
+                                    // Produktslider
 
-                        // Höger pil
+                                    // loopa maxsteg
+                                    // TODO(db): ProductCard är samma, bara datan ändras
 
-                        // Dot-indikator
-                        // grid läge för när man är i enskild kategori
+                                    // etikett i slutet av scrollning
+                                    // Tom kategori
+                                    // "Visa hela" kort i slutet
 
+                                    // Höger pil
+                                    // har mer än 4 produkter
 
-
-
-
-
-
-
-
+                                    // Dot-indikator
+                                    // Grid-läge på enskild kategori
+                                    // TODO(db): ProductCard är samma, bara datan ändras
                                     if id == 0 {
                                         div { class: "relative group",
 
