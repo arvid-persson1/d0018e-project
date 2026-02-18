@@ -9,7 +9,7 @@ pub fn Favorites() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
     let products = get_fake_products();
 
-    // Vi filtrerar din fake-data så vi bara får de som finns i favorites-listan
+    // Filtrera data, de tillagda i favriter är de som syns!
     let fav_items: Vec<_> = products
         .into_iter()
         .filter(|p| global_state.read().favorites.contains(&p.id))
@@ -18,6 +18,7 @@ pub fn Favorites() -> Element {
     rsx! {
         div { class: "container mx-auto p-8",
 
+            // Knapp för att gå tillbaka till main page
             Link {
                 to: Route::Home {},
                 class: "text-green-700 hover:text-green-900 font-bold flex items-center gap-2 mb-4 transition-colors",
