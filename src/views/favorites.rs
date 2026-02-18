@@ -7,9 +7,11 @@ use dioxus::prelude::*;
 #[component]
 pub fn Favorites() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
+    // TODO(db): Ersätt get_fake_products() med ett API-anrop
     let products = get_fake_products();
 
     // Filtrera data, de tillagda i favriter är de som syns!
+    // TODO(db): Favorit-ID:n ska sparas i databasen per användare istället för GlobalState
     let fav_items: Vec<_> = products
         .into_iter()
         .filter(|p| global_state.read().favorites.contains(&p.id))
@@ -35,6 +37,7 @@ pub fn Favorites() -> Element {
             } else {
                 div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6",
                     for p in fav_items {
+                        // TODO(db): ProductCard är samma, bara datan ändras
                         ProductCard {
                             id: p.id,
                             name: p.name,

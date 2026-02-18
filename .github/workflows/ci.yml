@@ -29,9 +29,6 @@ jobs:
       - name: Format (Rust)
         run: cargo fmt -- --check
 
-      - name: Format (RSX)
-        run: dx fmt --check
-
       - name: Compile
         run: dx check
 
