@@ -1,6 +1,7 @@
 use crate::Route;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
+
 // class for a product card
 #[derive(Props, Clone, PartialEq)]
 pub struct ProductProps {
@@ -14,12 +15,6 @@ pub struct ProductProps {
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
-    let items_in_cart = global_state
-        .read()
-        .cart_items
-        .iter()
-        .filter(|&&id| id == props.id)
-        .count();
 
     // kollar favorit
     let is_favorite = global_state.read().favorites.contains(&props.id);
@@ -61,23 +56,19 @@ pub fn ProductCard(props: ProductProps) -> Element {
 
             // Köpknapp och favoritknapp
             div { class: "flex items-center gap-2 mt-auto",
-                // 3. Vi använder items_in_cart istället för lokala count()
-                if items_in_cart == 0 {
+                if global_state.read().cart_items.iter().filter(|&&id| id == props.id).count() == 0 {
                     button {
                         class: "flex-grow bg-green-700 text-white font-bold py-2 rounded-full hover:bg-green-800 transition flex justify-center items-center gap-2",
                         onclick: move |_| {
-                            // LÄGG TILL ID i listan
                             global_state.write().cart_items.push(product_id);
                         },
                         i { class: "fas fa-shopping-cart" }
-                        "Köp"
                     }
                 } else {
                     div { class: "flex-grow flex items-center justify-between bg-green-100 rounded-full overflow-hidden",
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
-                                // TA BORT ETT ID från listan
                                 let mut state = global_state.write();
                                 if let Some(pos) = state.cart_items.iter().position(|&x| x == product_id) {
                                     state.cart_items.remove(pos);
@@ -85,11 +76,12 @@ pub fn ProductCard(props: ProductProps) -> Element {
                             },
                             i { class: "fas fa-minus" }
                         }
-                        span { class: "font-bold text-green-900", "{items_in_cart}" }
+                        span { class: "font-bold text-green-900",
+                            "{global_state.read().cart_items.iter().filter(|&&id| id == props.id).count()}"
+                        }
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
-                                // LÄGG TILL ID i listan igen
                                 global_state.write().cart_items.push(product_id);
                             },
                             i { class: "fas fa-plus" }
