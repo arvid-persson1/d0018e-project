@@ -14,7 +14,6 @@ pub struct ProductProps {
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut count = use_signal(|| 0);
-    let mut is_favorite = use_signal(|| false);
     let mut global_state = use_context::<Signal<GlobalState>>();
 
     // läser favorit direkt (bool ej funktion)

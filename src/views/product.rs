@@ -7,9 +7,10 @@ use dioxus::prelude::*;
 // Class for product page
 #[component]
 pub fn Product(id: i32) -> Element {
-    let mut count = use_signal(|| 0i32);
-    let mut is_favorite = use_signal(|| false);
     let mut global_state = use_context::<Signal<GlobalState>>();
+    let mut count = use_signal(|| 0i32);
+    let is_favorite = global_state.read().favorites.contains(&id);
+    let product_id = id;
     let nav = use_navigator();
 
     // Recension signal
@@ -28,7 +29,7 @@ pub fn Product(id: i32) -> Element {
     // Prisformatering
     let formatted_price = format!("{:.2}", product.price).replace('.', ",");
     let formatted_jfr = product.comparison_price.replace('.', ",");
-    let heart_class = if is_favorite() {
+    let heart_class = if is_favorite {
         "text-red-500"
     } else {
         "text-gray-400 hover:text-red-500"
@@ -155,7 +156,7 @@ pub fn Product(id: i32) -> Element {
                                     state.favorites.push(current_id);
                                 }
                             },
-                            if is_favorite() {
+                            if is_favorite {
                                 i { class: "fa-solid fa-heart text-2xl" }
                             } else {
                                 i { class: "fa-regular fa-heart text-2xl" }
