@@ -61,6 +61,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
                             global_state.write().cart_items.push(product_id);
                         },
                         i { class: "fas fa-shopping-cart" }
+                   
                     }
                 } else {
                     div { class: "flex-grow flex items-center justify-between bg-green-100 rounded-full overflow-hidden",
