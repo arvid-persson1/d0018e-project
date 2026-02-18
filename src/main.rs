@@ -46,8 +46,8 @@ fn main() {
 fn MainApp() -> Element {
     use_context_provider(|| {
         Signal::new(GlobalState {
-            cart_count: 0,
-            favorites: Vec::new(), // Initiera som en tom lista
+            favorites: Vec::new(),
+            cart_items: Vec::new(),
         })
     });
 

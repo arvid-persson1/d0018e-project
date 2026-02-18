@@ -42,6 +42,7 @@ pub fn Navbar() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
 
     let fav_count = global_state.read().favorites.len();
+    let cart_total = global_state.read().cart_items.len();
 
     rsx! {
 
@@ -104,7 +105,7 @@ pub fn Navbar() -> Element {
                             // varukorg
                             button { class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
                                 i { class: "fa-solid fa-basket-shopping" }
-                                span { "{global_state().cart_count}" }
+                                span { "{cart_total}" }
                             }
                         }
                     }
