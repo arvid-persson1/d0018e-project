@@ -14,11 +14,16 @@ pub struct ProductProps {
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
-    let items_in_cart = global_state.read().cart_items.iter().filter(|&&id| id == props.id).count();
-    
+    let items_in_cart = global_state
+        .read()
+        .cart_items
+        .iter()
+        .filter(|&&id| id == props.id)
+        .count();
+
     // kollar favorit
     let is_favorite = global_state.read().favorites.contains(&props.id);
-    
+
     let product_id = props.id;
 
     // Pris format

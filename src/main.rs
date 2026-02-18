@@ -44,10 +44,12 @@ fn main() {
 
 #[component]
 fn MainApp() -> Element {
-    use_context_provider(|| Signal::new(GlobalState {
-        favorites: Vec::new(),
-        cart_items: Vec::new(),
-    }));
+    use_context_provider(|| {
+        Signal::new(GlobalState {
+            favorites: Vec::new(),
+            cart_items: Vec::new(),
+        })
+    });
 
     rsx! {
         script { src: "https://cdn.tailwindcss.com" }

@@ -12,7 +12,12 @@ pub fn Product(id: i32) -> Element {
     let product_id = id;
     let nav = use_navigator();
 
-    let cart_count = global_state.read().cart_items.iter().filter(|&&item_id| item_id == id).count();
+    let cart_count = global_state
+        .read()
+        .cart_items
+        .iter()
+        .filter(|&&item_id| item_id == id)
+        .count();
 
     // Recension signal
     let mut text_val = use_signal(|| "".to_string());
