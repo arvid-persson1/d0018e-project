@@ -43,7 +43,8 @@ CREATE TABLE users (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE FUNCTION creation_time() RETURNS TRIGGER AS $$
+CREATE FUNCTION creation_time() RETURNS TRIGGER
+LANGUAGE plpgsql VOLATILE AS $$
 BEGIN
     NEW.created_at = CASE TG_OP
         WHEN 'INSERT' THEN CURRENT_TIMESTAMP
@@ -52,18 +53,19 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql VOLATILE;
+$$;
 
 CREATE TRIGGER users_creation_time
 BEFORE INSERT OR UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
-CREATE FUNCTION update_time() RETURNS TRIGGER AS $$
+CREATE FUNCTION update_time() RETURNS TRIGGER
+LANGUAGE plpgsql VOLATILE AS $$
 BEGIN
     NEW.updated_at := CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql VOLATILE;
+$$;
 
 CREATE TRIGGER users_update_time
 BEFORE UPDATE ON users
@@ -80,17 +82,18 @@ CREATE TABLE customers (
 CREATE TABLE vendors (
     id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     profile_picture URL,
-    display_name TEXT NOT NULL,
+    display_name TEXT UNIQUE NOT NULL,
     description TEXT NOT NULL
 );
 
-CREATE FUNCTION update_time_user_super() RETURNS TRIGGER AS $$
+CREATE FUNCTION update_time_user_super() RETURNS TRIGGER
+LANGUAGE plpgsql VOLATILE AS $$
 BEGIN
     UPDATE users SET updated_at = CURRENT_TIMESTAMP
     WHERE id = NEW.id;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql VOLATILE;
+$$;
 
 CREATE TRIGGER customers_update_time_super
 BEFORE UPDATE ON customers
@@ -100,7 +103,8 @@ CREATE TRIGGER vendors_update_time_super
 BEFORE UPDATE ON vendors
 FOR EACH ROW EXECUTE FUNCTION update_time_user_super();
 
-CREATE FUNCTION validate_user_subclass() RETURNS TRIGGER AS $$
+CREATE FUNCTION validate_user_subclass() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     CASE NEW.role
         WHEN 'customer' THEN
@@ -130,14 +134,15 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE CONSTRAINT TRIGGER users_valid_subclass
 AFTER INSERT OR UPDATE OF role ON users
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION validate_user_subclass();
 
-CREATE FUNCTION validate_user_superclass() RETURNS TRIGGER AS $$
+CREATE FUNCTION validate_user_superclass() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     CASE TG_TABLE_NAME
         WHEN 'customers'
@@ -150,7 +155,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER customers_valid_superclass
 BEFORE INSERT OR UPDATE OF id ON customers
@@ -160,7 +165,8 @@ CREATE TRIGGER vendors_valid_superclass
 BEFORE INSERT OR UPDATE OF id ON vendors
 FOR EACH ROW EXECUTE FUNCTION validate_user_superclass();
 
-CREATE FUNCTION validate_user_role_change() RETURNS TRIGGER AS $$
+CREATE FUNCTION validate_user_role_change() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     -- `id` is generated and so can't be changed.
     CASE OLD.role
@@ -180,20 +186,21 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER users_valid_role_change
 BEFORE UPDATE OF role ON users
 FOR EACH ROW EXECUTE FUNCTION validate_user_role_change();
 
-CREATE FUNCTION validate_user_subclass_deletion() RETURNS TRIGGER AS $$
+CREATE FUNCTION validate_user_subclass_deletion() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF EXISTS (SELECT 1 FROM users WHERE id = OLD.id) THEN
         RAISE EXCEPTION 'Must remove user superclass along with subclass.';
     END IF;
     RETURN OLD;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER customers_deletion
 BEFORE DELETE ON customers
@@ -203,7 +210,8 @@ CREATE TRIGGER vendors_deletion
 BEFORE DELETE ON vendors
 FOR EACH ROW EXECUTE FUNCTION validate_user_subclass_deletion();
 
-CREATE FUNCTION validate_user_one_subclass() RETURNS TRIGGER AS $$
+CREATE FUNCTION validate_user_one_subclass() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     CASE TG_TABLE_NAME
         WHEN 'customers' AND EXISTS (SELECT 1 FROM vendors WHERE id = NEW.id) THEN
@@ -216,7 +224,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER customers_unique_superclass
 BEFORE INSERT OR UPDATE OF id ON customers
@@ -233,7 +241,8 @@ CREATE TABLE categories (
 );
 
 CREATE TYPE CATEGORY_PATH_SEGMENT AS (id INT, name TEXT);
-CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[] AS $$
+CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[]
+LANGUAGE plpgsql STABLE AS $$
 DECLARE
     path category_path_segment[] := ARRAY[]::category_path_segment[];
     current categories%ROWTYPE;
@@ -257,14 +266,15 @@ BEGIN
 
     RETURN path;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
-CREATE FUNCTION categories_validate_tree() RETURNS TRIGGER AS $$
+CREATE FUNCTION categories_validate_tree() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     PERFORM category_path(NEW.id);
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER categories_valid_tree
 AFTER INSERT OR UPDATE OF parent ON categories
@@ -272,7 +282,7 @@ FOR EACH ROW EXECUTE FUNCTION categories_validate_tree();
 
 CREATE TABLE products (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     thumbnail URL NOT NULL,
     gallery URL[] NOT NULL,
     -- Domain is NOT restricted to positive values only, as a special offer could for example give
@@ -323,12 +333,13 @@ CREATE TABLE special_offers (
 
 CREATE VIEW active_special_offers AS
 SELECT *
-FROM SPECIAL_OFFERS
+FROM special_offers
 WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
 
 -- There is no technical reason why there couldn't be several active special offers: the price
 -- calculator would just have to choose the better price.
-CREATE FUNCTION offers_deny_overlap() RETURNS TRIGGER AS $$
+CREATE FUNCTION offers_deny_overlap() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF EXISTS (
         SELECT 1
@@ -342,7 +353,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER offers_no_overlap
 BEFORE INSERT OR UPDATE OF product, valid_from, valid_until ON special_offers
@@ -353,7 +364,8 @@ CREATE FUNCTION offers_discount(
     new_price special_offers.new_price%TYPE,
     quantity1 special_offers.quantity1%TYPE,
     quantity2 special_offers.quantity2%TYPE
-) RETURNS TWOPOINT_UDEC AS $$
+) RETURNS TWOPOINT_UDEC
+LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
     discount TWOPOINT_UDEC;
 BEGIN
@@ -397,9 +409,10 @@ BEGIN
 
     RETURN discount;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$;
 
-CREATE FUNCTION offers_validate_discount() RETURNS TRIGGER AS $$
+CREATE FUNCTION offers_validate_discount() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 DECLARE
     base_price products.price%TYPE;
 BEGIN
@@ -407,20 +420,21 @@ BEGIN
     PERFORM offers_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2);
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER offers_valid_discount
 BEFORE INSERT OR UPDATE OF product, new_price, quantity1, quantity2 ON special_offers
 FOR EACH ROW EXECUTE FUNCTION offers_validate_discount();
 
-CREATE FUNCTION products_validate_discounts() RETURNS TRIGGER AS $$
+CREATE FUNCTION products_validate_discounts() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     PERFORM offers_discount(NEW.price, new_price, quantity1, quantity2)
     FROM special_offers so
     WHERE so.product = NEW.id AND (so.valid_until IS NULL OR so.valid_until > CURRENT_TIMESTAMP);
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER products_valid_discounts
 BEFORE UPDATE OF price ON products
@@ -447,13 +461,27 @@ CREATE TABLE expiries (
     processed_at NONFUTURE_TIMESTAMP CONSTRAINT processed_after_expiry CHECK (processed_at >= expiry)
 );
 
-CREATE FUNCTION process_expiries() RETURNS void AS $$
-    -- Key doesn't matter as long as it's unique.
-    WITH lock AS (SELECT pg_advisory_xact_lock(hashtextextended('process_expiries', 0))),
+CREATE VIEW pending_expiries AS
+SELECT *
+FROM expiries
+WHERE processed_at IS NULL AND expiry <= CURRENT_DATE;
+
+CREATE FUNCTION process_expiries() RETURNS TABLE (
+    product INT,
+    -- NOTE: This is the naive sum of the listed number of expiries. It could be the case that
+    -- stock has been reduced for reasons other than expiries or purchases, in which case this
+    -- does *not* represent the number of products that actually expired.
+    total BIGINT
+) LANGUAGE sql VOLATILE AS $$
+    WITH product_lock AS (
+        SELECT DISTINCT product
+        FROM pending_expiries
+        JOIN products ON products.id = pending_expiries.product
+        FOR UPDATE OF products
+    ),
     processed AS (
-        UPDATE expiries
+        UPDATE pending_expiries
         SET processed_at = CURRENT_TIMESTAMP
-        WHERE expiry <= CURRENT_DATE AND processed_at IS NULL
         RETURNING product, number
     ),
     counts AS (
@@ -464,10 +492,11 @@ CREATE FUNCTION process_expiries() RETURNS void AS $$
     UPDATE products
     -- We accept that there might have "disappeared" products due to manual intervention. Maybe some
     -- units arrived with broken packaging.
-    SET in_stock = GREATEST(0, products.in_stock - counts.total)
+    SET in_stock = GREATEST(products.in_stock - counts.total, 0)
     FROM counts
-    WHERE products.id = counts.product;
-$$ LANGUAGE sql VOLATILE;
+    WHERE products.id = counts.product
+    RETURNING products.id, counts.total
+$$;
 
 -- WARN: Only actually runs at midnight. If the database is down at that time, expiries will be
 -- missed. Hence, call this function on establishing a connection to the database. If this is done,
@@ -516,7 +545,8 @@ CREATE TRIGGER reviews_update_time
 BEFORE UPDATE ON reviews
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
-CREATE FUNCTION reviewer_can_review() RETURNS TRIGGER AS $$
+CREATE FUNCTION reviewer_can_review() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF NOT (SELECT can_review FROM customers WHERE id = NEW.customer) THEN
         RAISE EXCEPTION 'Customer must be able to place reviews.';
@@ -524,19 +554,33 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER validate_reviewer
 BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 
--- TODO: Disallow voting on own review.
 CREATE TABLE review_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
     grade VOTE NOT NULL,
     PRIMARY KEY (review, customer)
 );
+
+CREATE FUNCTION no_vote_on_own_review() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    IF NEW.customer = (SELECT customer FROM reviews WHERE id = NEW.review) THEN
+        RAISE EXCEPTION 'Can''t vote on own review.';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER deny_own_review_vote
+BEFORE INSERT OR UPDATE OF customer, review ON review_votes
+FOR EACH ROW EXECUTE FUNCTION no_vote_on_own_review();
 
 CREATE TABLE comments (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -560,7 +604,8 @@ CREATE TRIGGER comments_update_time
 BEFORE UPDATE ON comments
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
-CREATE FUNCTION comment_parent_same_review() RETURNS TRIGGER AS $$
+CREATE FUNCTION comment_parent_same_review() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
 BEGIN
 
     IF NEW.parent IS NOT NULL
@@ -571,13 +616,14 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER comment_same_review
 BEFORE INSERT OR UPDATE OF parent, review ON comments
 FOR EACH ROW EXECUTE FUNCTION comment_parent_same_review();
 
-CREATE FUNCTION comments_validate_tree() RETURNS TRIGGER AS $$
+CREATE FUNCTION comments_validate_tree() RETURNS TRIGGER
+LANGUAGE plgpgsql STABLE AS $$
 DECLARE
     visited INT[] := ARRAY[NEW.id];
     current_id INT := NEW.parent;
@@ -595,19 +641,33 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 CREATE TRIGGER comments_valid_tree
 BEFORE INSERT OR UPDATE OF parent ON comments
 FOR EACH ROW EXECUTE FUNCTION comments_validate_tree();
 
--- TODO: Disallow voting on own comments.
 CREATE TABLE comment_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     comment INT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
     grade VOTE NOT NULL,
     PRIMARY KEY (comment, customer)
 );
+
+CREATE FUNCTION no_vote_on_own_comment() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    IF NEW.customer = (SELECT customer FROM comments WHERE id = NEW.comment) THEN
+        RAISE EXCEPTION 'Can''t vote on own comment.';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER deny_own_comment_vote
+BEFORE INSERT OR UPDATE OF customer, comment ON comment_votes
+FOR EACH ROW EXECUTE FUNCTION no_vote_on_own_comment();
 
 CREATE TABLE shopping_cart_items (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
