@@ -1,7 +1,5 @@
 //! The fullstack web app.
 
-#![feature(if_let_guard)]
-#![feature(stmt_expr_attributes)]
 #![feature(iter_collect_into)]
 #![cfg_attr(feature = "server", expect(clippy::todo, reason = "TODO"))]
 
