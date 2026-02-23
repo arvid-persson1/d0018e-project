@@ -560,6 +560,21 @@ CREATE TRIGGER validate_reviewer
 BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 
+CREATE FUNCTION reviewer_has_purchase() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM orders WHERE customer = NEW.customer AND product = NEW.product) THEN
+        RAISE EXCEPTION 'Reviewer must have previously bought the product.';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER validate_reviewer_purchase
+BEFORE INSERT OR UPDATE OF customer, product ON reviews
+FOR EACH ROW EXECUTE FUNCTION reviewer_has_purchase();
+
 CREATE TABLE review_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     review INT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
