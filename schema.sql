@@ -696,7 +696,7 @@ CREATE TABLE shopping_cart_items (
     product INT REFERENCES products(id) ON DELETE SET NULL,
     number POSITIVE_INT NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT one_item_per_customer_per_product UNIQUE (customer, product)
+    PRIMARY KEY (customer, product)
 );
 
 CREATE TRIGGER cart_update_time
