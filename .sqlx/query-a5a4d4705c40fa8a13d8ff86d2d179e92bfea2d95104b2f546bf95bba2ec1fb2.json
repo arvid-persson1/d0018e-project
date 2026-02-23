@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT gallery AS \"gallery: _\"\n        FROM products\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "gallery: _",
+        "type_info": {
+          "Custom": {
+            "name": "url[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "url",
+                  "kind": {
+                    "Domain": "Text"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a5a4d4705c40fa8a13d8ff86d2d179e92bfea2d95104b2f546bf95bba2ec1fb2"
+}

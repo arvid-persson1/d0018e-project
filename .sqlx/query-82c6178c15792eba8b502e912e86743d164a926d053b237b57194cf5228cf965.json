@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE special_offers\n        SET limit_per_customer = $2\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        {
+          "Custom": {
+            "name": "positive_int",
+            "kind": {
+              "Domain": "Int4"
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "82c6178c15792eba8b502e912e86743d164a926d053b237b57194cf5228cf965"
+}

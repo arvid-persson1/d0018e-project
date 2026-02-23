@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE products\n        SET gallery = gallery || $2\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        {
+          "Custom": {
+            "name": "url[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "url",
+                  "kind": {
+                    "Domain": "Text"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "102c6741e4f62b74ed988642f2f35cc15b8058da8f9a73d0e2a4d9cd8b06408a"
+}

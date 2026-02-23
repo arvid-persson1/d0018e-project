@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM special_offer_uses\n        WHERE customer = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "180a680f0a81da5caa802b41aaf3d8ffbc4aa318ef38155469f8d92dcdabb911"
+}

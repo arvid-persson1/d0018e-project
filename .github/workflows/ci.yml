@@ -86,3 +86,14 @@ jobs:
       - run: cargo binstall dioxus-cli@0.7.1 --force --no-confirm
       - run: dx fmt --check
       - run: dx check --verbose
+
+  sqlx:
+    name: SQLx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+      - run: cargo install sqlx-cli
+      - run: cargo sqlx prepare --check

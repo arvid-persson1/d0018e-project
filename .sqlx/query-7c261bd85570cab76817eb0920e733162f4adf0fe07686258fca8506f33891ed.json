@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT r.id, r.customer, username, profile_picture AS \"profile_picture!\", rating, r.created_at, r.updated_at, title, content,\n            SUM(CASE review_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END) AS \"sum_votes!\"\n        FROM reviews r\n        JOIN users ON users.id = r.customer\n        JOIN customers ON customers.id = r.customer\n        JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer\n        LEFT JOIN review_votes ON review_votes.review = r.id\n        WHERE r.product = $1\n        GROUP BY r.id, username, profile_picture, rating\n        ORDER BY \"sum_votes!\" DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "customer",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "profile_picture!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "rating",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 7,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "sum_votes!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "7c261bd85570cab76817eb0920e733162f4adf0fe07686258fca8506f33891ed"
+}

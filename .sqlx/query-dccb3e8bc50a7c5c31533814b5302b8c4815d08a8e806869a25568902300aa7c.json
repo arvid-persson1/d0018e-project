@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE shopping_cart_items\n        SET product = NULL\n        WHERE product = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dccb3e8bc50a7c5c31533814b5302b8c4815d08a8e806869a25568902300aa7c"
+}

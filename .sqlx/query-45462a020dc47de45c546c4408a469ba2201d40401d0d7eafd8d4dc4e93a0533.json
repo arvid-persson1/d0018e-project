@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM products\n        WHERE vendor = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "45462a020dc47de45c546c4408a469ba2201d40401d0d7eafd8d4dc4e93a0533"
+}

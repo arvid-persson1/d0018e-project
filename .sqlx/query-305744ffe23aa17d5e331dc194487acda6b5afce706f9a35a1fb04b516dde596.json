@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT r.id, rating, created_at, updated_at, title, content,\n            SUM(CASE review_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END) AS \"sum_votes!\"\n        FROM reviews r\n        JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer\n        LEFT JOIN review_votes ON review_votes.review = r.id\n        WHERE r.customer = $1 AND r.product = $2\n        GROUP BY r.id, rating\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "rating",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 4,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "sum_votes!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "305744ffe23aa17d5e331dc194487acda6b5afce706f9a35a1fb04b516dde596"
+}

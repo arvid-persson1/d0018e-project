@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE products\n        SET amount_per_unit = $2, measurement_unit = $3\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        {
+          "Custom": {
+            "name": "twopoint_udec",
+            "kind": {
+              "Domain": "Numeric"
+            }
+          }
+        },
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9a33dac5ad6b4c4a0cabd01454b6ec44db289a866945dbf3aeb544e7873d6fee"
+}
