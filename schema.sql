@@ -12,7 +12,12 @@ CREATE DOMAIN EMAIL AS citext CONSTRAINT valid_email CHECK (
 
 CREATE DOMAIN NONFUTURE_TIMESTAMP AS TIMESTAMP CHECK (VALUE <= CURRENT_TIMESTAMP);
 
+-- Arbitrary choice of precision and scale.
 CREATE DOMAIN TWOPOINT_UDEC AS DECIMAL(10, 2) CHECK (VALUE >= 0);
+
+-- TODO: Use more suitable integer types. For example, all current uses of `UINT` and
+-- `POSITIVE_INT` would work just as well with a backing `SMALLINT`, while IDs in some of the
+-- larger tables should possibly be `BIGINT`.
 
 CREATE DOMAIN UINT AS INT CHECK (VALUE >= 0);
 
