@@ -1,7 +1,6 @@
 //! Types produced by database operations.
 
-use super::{Category, Comment, Id, Product, Review, Vendor};
-use chrono::NaiveDateTime;
+use crate::database::{Id, Product};
 use derive_more::{Deref, Display, Into};
 use regex::Regex;
 use rust_decimal::Decimal;
@@ -9,31 +8,97 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use sqlx::Type;
 use std::{
+    cmp::Ordering,
     fmt::{Display, Error as FmtError, Formatter},
+    num::NonZeroU8,
     sync::LazyLock,
 };
+use thiserror::Error;
+use time::PrimitiveDateTime;
 
 /// URL to an external resource, owned.
 pub type Url = Box<str>;
 
-/// Quantity of a product along with unit, e.g. "4.2 kg" or "8.15 dl".
+/// Quantity of a product, possibly along with unit, e.g. "4.2 kg" or "8.15 dl".
+///
+/// If no unit is specified, the quantity is assumed to be in discrete amounts, and must be an
+/// integer.
 ///
 /// This type is oblivious to any actual meaning behind the units, so it can't for example handle
 /// conversions.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "server", derive(Type))]
 pub struct Amount {
     /// The quantity.
-    pub quantity: Decimal,
+    quantity: Decimal,
     /// The unit.
-    pub unit: Box<str>,
+    unit: Option<Box<str>>,
+}
+
+#[expect(missing_docs, reason = "TODO")]
+impl Amount {
+    // TODO: Add error variants.
+    #[must_use]
+    pub fn new(quantity: Decimal, unit: Option<Box<str>>) -> Option<Self> {
+        if quantity < Decimal::ZERO {
+            None
+        } else if unit.is_some() {
+            Some(Self { quantity, unit })
+        } else if quantity.is_integer() {
+            Some(Self {
+                quantity,
+                unit: None,
+            })
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub fn discrete(quantity: u32) -> Self {
+        Self {
+            quantity: quantity.into(),
+            unit: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_unit(quantity: Decimal, unit: Box<str>) -> Self {
+        Self {
+            quantity,
+            unit: Some(unit),
+        }
+    }
+
+    /// Get the quantity. If [`unit`](Self::unit) is [`None`], this will be an integer.
+    #[must_use]
+    pub const fn quantity(&self) -> Decimal {
+        self.quantity
+    }
+
+    /// Get the unit. If this is [`None`], [`quantity`](Self::quantity) will be an integer.
+    #[must_use]
+    pub fn unit(&self) -> Option<&str> {
+        self.unit.as_deref()
+    }
+}
+
+impl PartialOrd for Amount {
+    /// Compares the amounts if their units are equal, otherwise returns `None`.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let Self { quantity, unit } = self;
+        (*unit == other.unit).then(|| quantity.cmp(&other.quantity))
+    }
 }
 
 impl Display for Amount {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { quantity, unit } = self;
-        write!(f, "{quantity:.2} {unit}")
+        if let Some(unit) = unit {
+            write!(f, "{quantity:.2} {unit}")
+        } else {
+            write!(f, "{quantity}")
+        }
     }
 }
 
@@ -41,46 +106,74 @@ impl Display for Amount {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Into, Deref, Serialize, Deserialize,
 )]
-#[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
 // TODO: Derive `Deserialize` manually, disallowing out-of-range values.
-pub struct Rating(u8);
+// TODO: Add constant presets.
+pub struct Rating(NonZeroU8);
 
 impl Rating {
     /// Verifies the rating is in range and constructs a `Rating` on success.
-    #[inline]
+    #[must_use]
+    #[expect(clippy::missing_panics_doc, reason = "See note.")]
     pub fn new(r: u8) -> Option<Self> {
-        Some(r).filter(|r| (1..=5).contains(r)).map(Self)
+        (1..=5).contains(&r).then(|| {
+            #[expect(clippy::unwrap_used, reason = "Just verified.")]
+            Self(NonZeroU8::new(r).unwrap())
+        })
     }
 
-    /// Constructs a `Rating` without verifying range.
+    /// Get the inner numerical rating value.
     ///
-    /// # Safety
-    ///
-    /// Must ensure `1 <= r <= 5`.
-    #[inline]
+    /// This is equivalent to [`into`](Into::into), but with a known output type.
     #[must_use]
-    pub const unsafe fn new_unchecked(r: u8) -> Self {
-        Self(r)
+    pub const fn get(self) -> NonZeroU8 {
+        let Self(r) = self;
+        r
     }
 }
 
 /// The average rating of a product (between 1 and 5), as well as the number of ratings
 /// contributing to that score.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
-#[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 // TODO: Derive `Deserialize` manually, disallowing out-of-range values.
 pub struct AverageRating {
     /// The average rating, unspecified if `count` is 0.
-    rating: f32,
+    rating: f64,
     /// The number of ratings contributing to the score.
-    count: u32,
+    count: u64,
 }
+
+impl PartialOrd for AverageRating {
+    /// Compares the ratings, ignoring the counts.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AverageRating {
+    /// Compares the ratings, ignoring the counts.
+    fn cmp(&self, other: &Self) -> Ordering {
+        let Self { rating, count: _ } = self;
+        #[expect(clippy::unwrap_used, reason = "The rating is known to be real.")]
+        rating.partial_cmp(&other.rating).unwrap()
+    }
+}
+
+impl PartialEq for AverageRating {
+    /// Compares the ratings, ignoring the counts.
+    fn eq(&self, other: &Self) -> bool {
+        let Self { rating, count: _ } = self;
+        // The rating is known to be real.
+        *rating == other.rating
+    }
+}
+
+impl Eq for AverageRating {}
 
 impl AverageRating {
     /// Verifies the rating is in range and constructs an `AverageRating` on success.
-    #[inline]
+    // TODO: Add infallible variant based on `Rating`.
     #[must_use]
-    pub fn new(rating: f32, count: u32) -> Option<Self> {
+    pub fn new(rating: f64, count: u64) -> Option<Self> {
         if count == 0 {
             Some(Self {
                 rating: 0.,
@@ -93,21 +186,9 @@ impl AverageRating {
         }
     }
 
-    /// Constructs an `AverageRating` without verifying range.
-    ///
-    /// # Safety
-    ///
-    /// Must ensure `1 <= r <= 5`.
-    #[inline]
-    #[must_use]
-    pub const unsafe fn new_unchecked(rating: f32, count: u32) -> Self {
-        Self { rating, count }
-    }
-
     /// Returns the average rating if there are any.
-    #[inline]
     #[must_use]
-    pub const fn rating(self) -> Option<f32> {
+    pub const fn rating(self) -> Option<f64> {
         if self.count > 0 {
             Some(self.rating)
         } else {
@@ -116,16 +197,14 @@ impl AverageRating {
     }
 
     /// Returns the number of ratings.
-    #[inline]
     #[must_use]
-    pub const fn count(self) -> u32 {
+    pub const fn count(self) -> u64 {
         self.count
     }
 }
 
 impl Display for AverageRating {
     /// Formats the rating with a single decimal point.
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { rating, count } = *self;
         if count > 0 {
@@ -146,27 +225,13 @@ impl Display for AverageRating {
 /// between 3 and 20 characters long. Note that other scripts are allowed, so this does not put
 /// strict limits on byte length.
 #[derive(
-    Debug,
-    Default,
-    Display,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Into,
-    Deref,
-    Serialize,
-    Deserialize,
+    Debug, Display, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref, Serialize, Deserialize,
 )]
-#[expect(clippy::unsafe_derive_deserialize, reason = "TODO")]
 // TODO: Derive `Deserialize` manually, disallowing invalid values.
 pub struct Username(Box<str>);
 
 impl Username {
     /// Verifies the format and constructs a `Username` on success.
-    #[inline]
     pub fn new(s: Box<str>) -> Option<Self> {
         static USERNAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(r"^[\w-]{3,20}$").expect("Failed to compile regex pattern.")
@@ -174,87 +239,65 @@ impl Username {
 
         Some(s).filter(|s| USERNAME_PATTERN.is_match(s)).map(Self)
     }
+}
 
-    /// Constructs a `Username` without verifying format.
-    ///
-    /// # Safety
-    ///
-    /// Must ensure the string fits the format, see [type documentation](Self).
-    #[inline]
-    #[must_use]
-    pub const unsafe fn new_unchecked(s: Box<str>) -> Self {
-        Self(s)
+// TODO: Link to specification.
+/// A valid Email address, according to the HTML5 specification.
+///
+/// Notably, this is *not* compatible with RFC5322.
+#[derive(
+    Debug, Display, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref, Serialize, Deserialize,
+)]
+// TODO: Derive `Deserialize` manually, disallowing invalid values.
+pub struct Email(Box<str>);
+
+impl Email {
+    /// Verifies the format and constructs an `Email` on success.
+    pub fn new(s: Box<str>) -> Option<Self> {
+        static EMAIL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$").expect("Failed to compile regex pattern.")
+        });
+
+        Some(s).filter(|s| EMAIL_PATTERN.is_match(s)).map(Self)
     }
 }
 
-/// An overview of a product, for display on product cards.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ProductOverview {
-    /// The ID of the product.
-    pub id: Id<Product>,
-    /// The name of the product.
-    pub name: Box<str>,
-    /// URL to an image to display on the product card.
-    pub thumbnail: Url,
-    /// The price of the product before any discounts.
-    pub price: Decimal,
-    /// A short description of the proudct,
-    pub overview: Box<str>,
-    /// How many units are in stock. This should not be displayed on the card directly, but may
-    /// be used to display "low stock".
-    pub in_stock: i32,
-    /// How much of the product is included in one unit.
-    pub amount_per_unit: Option<Amount>,
-    /// The name of the vendor.
-    pub vendor_name: Box<str>,
-    /// The origin of the product. This may or may not be the name of a country.
-    pub origin: Box<str>,
-    /// The currently active special offer on the product, if any. This is a tuple
-    /// `(deal, members_only)` where `members_only` indicates whether the special offer is
-    /// available only to members.
-    pub special_offer: Option<(Deal, bool)>,
-}
+/// URL to the profile picture all admins use.
+pub const ADMIN_PROFILE_PICTURE: &str = "";
 
-/// Information about a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ProductInfo {
-    /// The ID of the product.
-    pub id: Id<Product>,
-    /// The name of the product.
-    pub name: Box<str>,
-    /// URLs to images of the product.
-    pub gallery: Box<[Url]>,
-    /// The price of the product before any discounts.
-    pub price: Decimal,
-    /// A long description of the product.
-    pub description: Box<str>,
-    /// How many units are in stock. This should not be displayed on the page directly, but may
-    /// be used to display "low stock".
-    pub in_stock: u32,
-    /// The category of the product and all of its parents, starting from the root.
-    pub category: CategoryPath,
-    /// How much of the product is included in one unit.
-    pub amount_per_unit: Option<Amount>,
-    /// Whether the product is visible to customers. Administrators should be able to see all
-    /// products, and vendors should be able to see their own even if they are hidden.
-    pub visible: bool,
-    /// The ID of the vendor.
-    pub vendor_id: Id<Vendor>,
-    /// The name of the vendor.
-    pub vendor_name: Box<str>,
-    /// The origin of the product. This may or may not be the name of a country.
-    pub origin: Box<str>,
-    /// When the product was created. This refers to the entry for the product in the system, not
-    /// the date any unit was manufactured.
-    pub created_at: NaiveDateTime,
-    /// When the product was last updated.
-    pub updated_at: NaiveDateTime,
-    /// The average rating of the product.
-    pub rating: AverageRating,
-    /// The currently active special offer on the product, if any. This is a tuple
-    /// `(deal, members_only)` where `members_only` indicates whether the special offer is
-    /// available only to members.
-    pub special_offer: Option<(Deal, bool)>,
+/// A user's profile picture.
+///
+/// Customers and vendors can set their own profile pictures, while admins always have the same
+/// fixed one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProfilePicture(Option<Url>);
+
+impl ProfilePicture {
+    /// Construct a new `ProfilePicture` for a customer or vendor from a URL.
+    #[must_use]
+    pub const fn new(url: Url) -> Self {
+        Self(Some(url))
+    }
+
+    /// Construct a new `ProfilePicture` for an administrator.
+    #[must_use]
+    pub const fn admin() -> Self {
+        Self(None)
+    }
+
+    /// Get whether the profile picture is [`ADMIN_PROFILE_PICTURE`].
+    #[must_use]
+    pub const fn is_admin(&self) -> bool {
+        let Self(url) = self;
+        url.is_none()
+    }
+
+    /// Returns the URL to the profile picture.
+    #[must_use]
+    pub fn url(&self) -> &str {
+        let Self(url) = self;
+        url.as_deref().unwrap_or(ADMIN_PROFILE_PICTURE)
+    }
 }
 
 /// Details on the discount of a special offer.
@@ -262,7 +305,7 @@ pub struct ProductInfo {
 /// This type is unaware of what product it belongs to or its pricing, and is therefore unable to
 /// verify that it actually provides a discount. Nevertheless, attempting to insert such a special
 /// offer into the database will result in an error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Deal {
     /// The price has been reduced.
     Discount {
@@ -285,11 +328,14 @@ pub enum Deal {
     },
 }
 
-/// Errors created by [`SpecialOfferDeal::new`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SpecialOfferDealError {
+/// Errors created by [`Deal::new`].
+// NOTE: Defensively not `Eq`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+pub enum DealError {
+    #[error("Invalid type of special offer.")]
     /// The arguments did not represent a valid type of special offer.
     InvalidVariant,
+    #[error("Special offer does not provide discount.")]
     /// The deal did not actually provide a discount. The deal is given anyway in case this was
     /// expected.
     NoDiscount(Deal),
@@ -308,18 +354,41 @@ impl Deal {
     ///
     /// # Errors
     ///
-    /// Returns [`InvalidVariant`](SpecialOfferDeal::InvalidVariant) if none of the above cases
-    /// match, or [`NoDiscount`](SpecialOfferDeal::NoDiscount) if the deal is structurally valid
+    /// Returns [`InvalidVariant`](DealError::InvalidVariant) if none of the above cases
+    /// match, or [`NoDiscount`](DealError::NoDiscount) if the deal is structurally valid
     /// but does not actually provide a discount compared to the price of the product.
     ///
     /// Silently overflows if either quantity is [`Some`] and negative.
-    #[inline]
     pub fn new(
         new_price: Option<Decimal>,
         quantity1: Option<i32>,
         quantity2: Option<i32>,
         base_price: Decimal,
-    ) -> Result<Option<Self>, SpecialOfferDealError> {
+    ) -> Result<Self, DealError> {
+        let deal = Self::try_new(new_price, quantity1, quantity2, base_price)?;
+        deal.ok_or(DealError::InvalidVariant)
+    }
+
+    /// Constructs a new `Deal` from the format used in the database.
+    ///
+    /// Unlike [`new`], this returns an <code>[Option]\<Deal\></code>, allowing all fields to be
+    /// [`None`] and then producing [`None`]. See [`new`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidVariant`](DealError::InvalidVariant) if none of the above cases
+    /// match, or [`NoDiscount`](DealError::NoDiscount) if the deal is structurally valid
+    /// but does not actually provide a discount compared to the price of the product.
+    ///
+    /// Silently overflows if either quantity is [`Some`] and negative.
+    ///
+    /// [`new`]: Self::new
+    pub fn try_new(
+        new_price: Option<Decimal>,
+        quantity1: Option<i32>,
+        quantity2: Option<i32>,
+        base_price: Decimal,
+    ) -> Result<Option<Self>, DealError> {
         let deal = match (new_price, quantity1, quantity2) {
             (Some(new_price), None, None) => Self::Discount { new_price },
             (None, Some(take), Some(pay_for)) => Self::Batch {
@@ -331,12 +400,12 @@ impl Deal {
                 take: take as u32,
             },
             (None, None, None) => return Ok(None),
-            _ => return Err(SpecialOfferDealError::InvalidVariant),
+            _ => return Err(DealError::InvalidVariant),
         };
         if deal.discount_average(base_price).is_some() {
             Ok(Some(deal))
         } else {
-            Err(SpecialOfferDealError::NoDiscount(deal))
+            Err(DealError::NoDiscount(deal))
         }
     }
 
@@ -345,6 +414,7 @@ impl Deal {
     /// Specifically, this returns a tuple representing the columns  `new_price`, `quantity1` and
     /// `quantity2` respectively on success. If either quantity is greater than `i32::MAX`, `None`
     /// is returned.
+    #[must_use]
     pub fn database_repr(self) -> Option<(Option<Decimal>, Option<i32>, Option<i32>)> {
         match self {
             Self::Discount { new_price } => Some((Some(new_price), None, None)),
@@ -363,7 +433,6 @@ impl Deal {
 
     /// Calculates the discount in percent as average per unit. If the deal doesn't actually offer
     /// a price reduction, `None` is returned.
-    #[inline]
     #[must_use]
     pub fn discount_average(self, base_price: Decimal) -> Option<Decimal> {
         match self {
@@ -385,72 +454,6 @@ impl Deal {
     }
 }
 
-/// A category with its subcategories, for display in a tree.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CategoryTree {
-    /// The ID of the category.
-    pub id: Id<Category>,
-    /// The name of the category.
-    pub name: Box<str>,
-    /// All direct subcategories.
-    pub subcategories: Vec<Self>,
-}
-
-/// A category with its supercategories, for display on product pages, starting from the root.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CategoryPath {
-    /// The segments of the path. Each item is a tuple `(id, name)`.
-    pub segments: Box<[(Id<Category>, Box<str>)]>,
-}
-
-/// A customer's own review of a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OwnReview {
-    /// The ID of the review.
-    pub id: Id<Review>,
-    /// The given rating of the product.
-    pub rating: Rating,
-    /// When the review was created.
-    pub created_at: NaiveDateTime,
-    /// When the review was last updated.
-    pub updated_at: NaiveDateTime,
-    /// The title of the review.
-    pub title: Box<str>,
-    /// The content of the review.
-    pub content: Box<str>,
-    /// Comment trees on the review.
-    pub comments: Box<[CommentTree]>,
-    /// The sum of all votes on the review, adding 1 per like and subtracting 1 per dislike.
-    pub sum_votes: i32,
-}
-
-/// A review of a product, for display on product pages.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ProductReview {
-    /// The ID of the review.
-    pub id: Id<Review>,
-    /// The username of the authoring customer.
-    pub username: Username,
-    /// The profile picture of the authoring customer.
-    pub profile_picture: Url,
-    /// The given rating of the product.
-    pub rating: Rating,
-    /// When the review was created.
-    pub created_at: NaiveDateTime,
-    /// When the review was last updated.
-    pub updated_at: NaiveDateTime,
-    /// The title of the review.
-    pub title: Box<str>,
-    /// The content of the review.
-    pub content: Box<str>,
-    /// Comment trees on the review.
-    pub comments: Box<[CommentTree]>,
-    /// The sum of all votes on the review, adding 1 per like and subtracting 1 per dislike.
-    pub sum_votes: i32,
-    /// The customer's own vote, if any.
-    pub own_vote: Option<Vote>,
-}
-
 /// A record of a customer's review, for display on profile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CustomerReview {
@@ -468,54 +471,25 @@ pub struct CustomerReview {
     pub content: Box<str>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A vote on a review or comment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(Type))]
 pub enum Vote {
-    /// The user liked the review/comment. Counts as 1 for tallying.
-    Like,
     /// The user disliked the review/comment. Counts as -1 for tallying.
     Dislike,
+    /// The user liked the review/comment. Counts as 1 for tallying.
+    Like,
 }
 
-/// A comment with its replies, for display in a tree.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CommentTree {
-    /// The ID of the comment.
-    pub id: Id<Comment>,
-    /// The username of the author.
-    pub username: Username,
-    /// The role of the author. See [`CommentRole`] for details.
-    pub user_role: CommentRole,
-    /// The content of the comment.
-    pub content: Box<str>,
-    /// When the comment was created.
-    pub created_at: NaiveDateTime,
-    /// When the comment was last updated.
-    pub updated_at: NaiveDateTime,
-    /// The sum of all votes on the review, adding 1 per like and subtracting 1 per dislike.
-    pub sum_votes: i32,
-    /// The customer's own vote, if any.
-    pub own_vote: Option<Vote>,
-    /// All direct replies to the comment.
-    pub replies: Box<[Self]>,
-}
-
-/// The role of the user placing a comment. In some cases, a special badge should be displayed by
-/// the comment.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[expect(variant_size_differences, reason = "Difference is neglibile.")]
-pub enum CommentRole {
-    /// The author is a user. The original poster of the review should get a badge.
-    User {
-        /// Whether the user was the orignal poster of the review.
-        original_poster: bool,
-    },
-    /// The author is a vendor. The vendor of the reviewed product should get a badge.
-    Vendor {
-        /// The ID of the vendor, to be compared with the product's vendor ID.
-        id: Id<Vendor>,
-    },
-    /// The user is a site administrator. Administrators should always get a badge.
+/// The role of a user.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(Type))]
+pub enum Role {
+    /// The author is a customer.
+    Customer,
+    /// The author is a vendor.
+    Vendor,
+    /// The user is a site administrator.
     Administrator,
 }
 
@@ -550,13 +524,14 @@ pub struct Purchase {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Order {
     /// The time of purchase.
-    pub time: NaiveDateTime,
+    pub time: PrimitiveDateTime,
     /// Purchases included in this order.
     pub purchases: Box<[Purchase]>,
 }
 
 impl Order {
     /// Calculcates the total price of all purchases in the order.
+    #[must_use]
     pub fn price(&self) -> Decimal {
         self.purchases.iter().map(|purchase| purchase.paid).sum()
     }

@@ -1,6 +1,6 @@
 use crate::{
     Route,
-    database::{Login, category_trees, logged_in},
+    database::{Login, categories::category_trees, logged_in},
 };
 use dioxus::prelude::*;
 
@@ -48,14 +48,6 @@ pub fn Navbar() -> Element {
                 Some(Err(e)) => return Err(e.clone().into()),
             }
             Link { to: Route::Home {}, "Home" }
-            button {
-                // TODO: How to handle errors in event handlers? Test the default behavior.
-                onclick: move |_| async move {
-                    use crate::database::delete_user;
-                    delete_user(1.into()).await
-                },
-                "Test button"
-            }
             Link { to: Route::ProductPage { id: 1.into() }, "Sample product" }
         }
         Outlet::<Route> {}

@@ -1,18 +1,25 @@
 //! The fullstack web app.
 
 #![feature(if_let_guard)]
+#![feature(stmt_expr_attributes)]
+#![feature(iter_collect_into)]
+#![cfg_attr(feature = "server", expect(clippy::todo, reason = "TODO"))]
 
 use dioxus::prelude::*;
 use views::{CategoryPage, FavoritesPage, Home, Navbar, ProductPage, Profile, VendorPage};
+#[cfg(feature = "server")]
+use {database::init_connection, futures::executor::block_on};
+
 pub mod components;
-pub mod database;
 pub mod views;
+
+pub mod database;
 use database::{Category, Id, Product, Vendor};
 
 /// Structure of internal routes in our app. Each variant represents a different URL pattern that
 /// can be matched by the router. If that pattern is matched, the components for that route will be
 /// rendered.
-#[derive(Debug, Clone, Routable, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Routable)]
 enum Route {
     #[layout(Navbar)]
 
@@ -66,11 +73,9 @@ fn App() -> Element {
 fn main() {
     #[cfg(feature = "server")]
     {
-        use database::init_connection;
-        use futures::executor::block_on;
-
         let database_url = dotenvy::var("DATABASE_URL").expect("`DATABASE_URL` not set.");
-        block_on(init_connection(database_url));
+        block_on(init_connection(database_url))
+            .expect("Failed to establish a connection to the database.");
     }
 
     launch(App);

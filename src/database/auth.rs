@@ -1,7 +1,5 @@
 //! Rudimentary authentication.
 
-#![allow(clippy::future_not_send, reason = "Violated by the `#[server]` macro.")]
-
 use crate::{
     Id,
     database::{Administrator, Customer, Username, Vendor},
@@ -13,13 +11,13 @@ use serde::{Deserialize, Serialize};
 
 /// Get information about the currently logged in user, if any.
 #[expect(clippy::missing_errors_doc, reason = "TODO")]
-#[expect(clippy::todo, reason = "TODO")]
 #[server]
-pub(crate) async fn logged_in() -> Result<Option<Login>> {
+pub async fn logged_in() -> Result<Option<Login>> {
     todo!()
 }
 
 /// Information about a login session.
+// TODO: Include profile picture.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Login {
     /// The username of the logged in user.
@@ -40,7 +38,6 @@ pub enum LoginId {
 }
 
 impl PartialEq<Id<Customer>> for LoginId {
-    #[inline]
     fn eq(&self, other: &Id<Customer>) -> bool {
         if let Self::Customer(id) = self {
             id == other
@@ -51,7 +48,6 @@ impl PartialEq<Id<Customer>> for LoginId {
 }
 
 impl PartialEq<Id<Vendor>> for LoginId {
-    #[inline]
     fn eq(&self, other: &Id<Vendor>) -> bool {
         if let Self::Vendor(id) = self {
             id == other
@@ -62,7 +58,6 @@ impl PartialEq<Id<Vendor>> for LoginId {
 }
 
 impl PartialEq<Id<Administrator>> for LoginId {
-    #[inline]
     fn eq(&self, other: &Id<Administrator>) -> bool {
         if let Self::Administrator(id) = self {
             id == other

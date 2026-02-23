@@ -7,7 +7,6 @@ repository = "https://www.github.com/arvid-persson1/d0018e-project"
 version = "0.1.0"
 
 [dependencies]
-chrono = { default-features = false, features = ["serde", "std"], version = "0.4.43" }
 derive_more = { default-features = false, features = [
     "deref",
     "display",
@@ -26,6 +25,7 @@ hashbrown = { default-features = false, features = [
     "inline-more",
     "nightly",
 ], optional = true, version = "0.16.1" }
+nameof = "1.3.0"
 regex = { default-features = false, features = [
     "perf",
     "perf-dfa-full",
@@ -37,8 +37,12 @@ serde = { default-features = false, features = ["alloc", "derive", "std"], versi
 sqlx = { default-features = false, features = [
     "macros",
     "postgres",
+    "runtime-tokio",
     "rust_decimal",
+    "time",
 ], optional = true, version = "0.8.6" }
+thiserror = "2.0.18"
+time = { features = ["serde"], version = "0.3.47" }
 tokio = { default-features = false, features = [
     "parking_lot",
     "rt-multi-thread",
@@ -87,6 +91,8 @@ unsafe_code = "allow"
 unstable_features = "allow"
 # Many false positives.
 missing_copy_implementations = "allow"
+# Noisy in binaries.
+unreachable_pub = "allow"
 # Code style, refactor artifacts, simplification, performance, likely mistakes.
 absolute_paths_not_starting_with_crate = "deny"
 explicit_outlives_requirements = "deny"
@@ -97,7 +103,6 @@ single_use_lifetimes = "deny"
 trivial_casts = "deny"
 trivial_numeric_casts = "deny"
 unit_bindings = "deny"
-unreachable_pub = "deny"
 unused_crate_dependencies = "deny"
 unused_extern_crates = "deny"
 unused_import_braces = "deny"
@@ -120,20 +125,20 @@ variant_size_differences = "deny"
 # Platform/program-dependent.
 linker_messages = "deny"
 # Bad ideas.
-non_ascii_idents = "forbid"
+non_ascii_idents = "deny"
 # Unsafe patterns with safe(r) alternatives, unsafe code parading as safe.
-deprecated_safe_2024 = "forbid"
-missing_unsafe_on_extern = "forbid"
-unsafe_attr_outside_unsafe = "forbid"
+deprecated_safe_2024 = "deny"
+missing_unsafe_on_extern = "deny"
+unsafe_attr_outside_unsafe = "deny"
 # Forward compatibility for older Rust versions.
-keyword_idents_2018 = "forbid"
-keyword_idents_2024 = "forbid"
-rust_2021_incompatible_or_patterns = "forbid"
-rust_2021_prefixes_incompatible_syntax = "forbid"
-rust_2021_prelude_collisions = "forbid"
-rust_2024_guarded_string_incompatible_syntax = "forbid"
-rust_2024_incompatible_pat = "forbid"
-rust_2024_prelude_collisions = "forbid"
+keyword_idents_2018 = "deny"
+keyword_idents_2024 = "deny"
+rust_2021_incompatible_or_patterns = "deny"
+rust_2021_prefixes_incompatible_syntax = "deny"
+rust_2021_prelude_collisions = "deny"
+rust_2024_guarded_string_incompatible_syntax = "deny"
+rust_2024_incompatible_pat = "deny"
+rust_2024_prelude_collisions = "deny"
 # Forward compatibility regarding never type.
 dependency_on_unit_never_type_fallback = "warn"
 never_type_fallback_flowing_into_unsafe = "deny"
@@ -218,6 +223,10 @@ cognitive_complexity = "allow"
 redundant_pub_crate = "allow"
 # Many false positives.
 decimal_literal_representation = "allow"
+# Defensive style.
+unneeded_field_pattern = "allow"
+# Noisy in binaries.
+missing_inline_in_public_items = "allow"
 # Fine to use, but should be allowed with a `reason`. Prefer `expect` over `unwrap`.
 todo = "warn"
 unimplemented = "warn"
@@ -228,7 +237,6 @@ if_not_else = "warn"
 into_iter_without_iter = "warn"
 iter_without_into_iter = "warn"
 missing_const_for_fn = "warn"
-missing_inline_in_public_items = "warn"
 must_use_candidate = "warn"
 mutex_atomic = "warn"
 mutex_integer = "warn"
@@ -357,7 +365,6 @@ unnecessary_safety_doc = "deny"
 unnecessary_semicolon = "deny"
 unnecessary_struct_initialization = "deny"
 unnecessary_wraps = "deny"
-unneeded_field_pattern = "deny"
 unnested_or_patterns = "deny"
 unreadable_literal = "deny"
 unseparated_literal_suffix = "deny"
@@ -407,7 +414,6 @@ filetype_is_file = "deny"
 fn_params_excessive_bools = "deny"
 format_collect = "deny"
 format_push_string = "deny"
-future_not_send = "deny"
 get_unwrap = "deny"
 large_include_file = "deny"
 large_types_passed_by_value = "deny"
@@ -449,46 +455,49 @@ unsafe_derive_deserialize = "deny"
 volatile_composites = "deny"
 while_float = "deny"
 # Promoted from warnings: certain mistakes.
-cast_enum_truncation = "forbid"
-cast_nan_to_int = "forbid"
-duplicated_attributes = "forbid"
-fn_to_numeric_cast = "forbid"
-forget_non_drop = "forbid"
-four_forward_slashes = "forbid"
-from_raw_with_void_ptr = "forbid"
-incompatible_msrv = "forbid"
-non_canonical_clone_impl = "forbid"
-non_canonical_partial_ord_impl = "forbid"
-pointers_in_nomem_asm_block = "forbid"
+cast_enum_truncation = "deny"
+cast_nan_to_int = "deny"
+duplicated_attributes = "deny"
+fn_to_numeric_cast = "deny"
+forget_non_drop = "deny"
+four_forward_slashes = "deny"
+from_raw_with_void_ptr = "deny"
+incompatible_msrv = "deny"
+non_canonical_clone_impl = "deny"
+non_canonical_partial_ord_impl = "deny"
+pointers_in_nomem_asm_block = "deny"
 # Bad ideas.
-as_ptr_cast_mut = "forbid"
-cfg_not_test = "forbid"
-debug_assert_with_mut_call = "forbid"
-disallowed_script_idents = "forbid"
-empty_loop = "forbid"
-enum_glob_use = "forbid"
-exit = "forbid"
-implicit_hasher = "forbid"
-infinite_loop = "forbid"
-missing_spin_loop = "forbid"
-mut_mut = "forbid"
-non_send_fields_in_send_ty = "forbid"
-ref_option = "forbid"
-ref_option_ref = "forbid"
-wildcard_dependencies = "forbid"
-wildcard_imports = "forbid"
+as_ptr_cast_mut = "deny"
+cfg_not_test = "deny"
+debug_assert_with_mut_call = "deny"
+disallowed_script_idents = "deny"
+empty_loop = "deny"
+enum_glob_use = "deny"
+exit = "deny"
+implicit_hasher = "deny"
+infinite_loop = "deny"
+missing_spin_loop = "deny"
+mut_mut = "deny"
+non_send_fields_in_send_ty = "deny"
+ref_option = "deny"
+ref_option_ref = "deny"
+wildcard_dependencies = "deny"
+wildcard_imports = "deny"
 # Unsafe patterns with safe(r) alternatives, unsafe code parading as safe.
-as_pointer_underscore = "forbid"
-borrow_as_ptr = "forbid"
-cast_ptr_alignment = "forbid"
-cast_slice_from_raw_parts = "forbid"
-crosspointer_transmute = "forbid"
-manual_dangling_ptr = "forbid"
-no_mangle_with_rust_abi = "forbid"
-ptr_as_ptr = "forbid"
-ptr_cast_constness = "forbid"
-ref_as_ptr = "forbid"
-swap_ptr_to_ref = "forbid"
-transmute_undefined_repr = "forbid"
-# Required by Dioxus (can't be `forbid`).
+as_pointer_underscore = "deny"
+borrow_as_ptr = "deny"
+cast_ptr_alignment = "deny"
+cast_slice_from_raw_parts = "deny"
+crosspointer_transmute = "deny"
+manual_dangling_ptr = "deny"
+no_mangle_with_rust_abi = "deny"
+ptr_as_ptr = "deny"
+ptr_cast_constness = "deny"
+ref_as_ptr = "deny"
+swap_ptr_to_ref = "deny"
+transmute_undefined_repr = "deny"
+# Noisy with Dioxus.
+future_not_send = "allow"
+too_many_arguments = "allow"
+# Required by Dioxus (can't be `deny`).
 transmute_ptr_to_ptr = "deny"
