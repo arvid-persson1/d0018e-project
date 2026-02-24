@@ -59,16 +59,18 @@ fn try_build_special_offer(
 /// Panics if the values do not uphold any of the database's invariants.
 #[cfg(feature = "server")]
 #[expect(clippy::unreachable, reason = "Database validation only.")]
-fn build_average_rating(average_rating: Option<f64>, rating_count: Option<i64>) -> AverageRating {
+fn build_average_rating(average_rating: Option<f64>, rating_count: i64) -> AverageRating {
     match (average_rating, rating_count) {
-        (Some(average_rating), Some(rating_count)) => AverageRating::new(
+        (None, 0) => AverageRating::default(),
+        (Some(_), 0) | (None, _) => {
+            unreachable!("Database returned inconsistent average rating data.")
+        },
+        (Some(average_rating), rating_count) => AverageRating::new(
             average_rating,
             rating_count
                 .try_into()
                 .expect("Database returned negative rating count."),
         )
         .expect("Database returned invalid average rating."),
-        (None, None) => AverageRating::default(),
-        _ => unreachable!("Database returned inconsistent average rating data."),
     }
 }

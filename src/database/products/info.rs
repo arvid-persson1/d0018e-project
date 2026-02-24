@@ -97,7 +97,7 @@ struct ProductInfoRepr {
     vendor_name: String,
     category_path: Vec<CategoryPathSegment>,
     average_rating: Option<f64>,
-    rating_count: Option<i64>,
+    rating_count: i64,
     favorited: bool,
     own_rating: Option<i32>,
     has_purchased: bool,
@@ -201,7 +201,7 @@ pub async fn product_info(
             vendors.id AS vendor_id, vendors.display_name AS vendor_name,
             category_path(category) AS "category_path!: Vec<CategoryPathSegment>",
             AVG(ratings.rating::FLOAT) AS average_rating,
-            COUNT(ratings.rating) AS rating_count,
+            COUNT(ratings.rating) AS "rating_count!",
             EXISTS(
                 SELECT 1
                 FROM customer_favorites cf
