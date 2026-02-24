@@ -249,7 +249,7 @@ impl From<ProductReprDiscounted> for ProductOverviewDiscounted {
             amount_per_unit: build_amount(amount_per_unit, measurement_unit),
             vendor_name: vendor_name.into(),
             origin: origin.into(),
-            special_offer_deal: Deal::new(new_price, quantity1, quantity2, price)
+            special_offer_deal: Deal::from_repr(new_price, quantity1, quantity2, price)
                 .expect("Database returned invalid special offer."),
             special_offer_members_only: members_only,
             favorited,
@@ -430,7 +430,7 @@ pub async fn newest_products(
 // change "on their own" due to special offers running expiring.
 
 /// Get other products in the same category as a given one sorted by best discounts, as defined by
-/// [`discount_average`](Deal::discount_average).
+/// [`average_discount`](VerifiedDeal::average_discount).
 ///
 /// Only visible products with units in stock are considered.
 ///
@@ -479,7 +479,7 @@ pub async fn similar_products(
     .inspect(|products| {
         debug_assert!(
             products.is_sorted_by_key(|ProductOverview { special_offer, price, .. }|
-                Reverse(special_offer.map(|(deal, _)| deal.discount_average(*price)))
+                Reverse(special_offer.map(|(deal, _)| deal.average_discount(*price)))
             )
         );
     })
@@ -487,7 +487,7 @@ pub async fn similar_products(
 }
 
 /// Get products with active discounts sorted by best discounts, as defined by
-/// [`discount_average`](Deal::discount_average).
+/// [`average_discount`](VerifiedDeal::average_discount).
 ///
 /// Only visible products with units in stock are considered.
 ///
@@ -532,7 +532,7 @@ pub async fn best_discounts(
     .inspect(|products| {
         debug_assert!(
             products.is_sorted_by_key(|ProductOverviewDiscounted { special_offer_deal, price, .. }|
-                Reverse(special_offer_deal.discount_average(*price))
+                Reverse(special_offer_deal.average_discount(*price))
             )
         );
     })
@@ -540,7 +540,7 @@ pub async fn best_discounts(
 }
 
 /// Get products owned by a given vendor sorted by best discounts as defined by
-/// [`discount_average`](Deal::discount_average), then name.
+/// [`average_discount`](VerifiedDeal::average_discount), then name.
 ///
 /// Only visible products are considered, but includes products out of stock.
 ///
@@ -587,7 +587,7 @@ pub async fn vendor_products(
     .inspect(|products| {
         debug_assert!(
             products.is_sorted_by_key(|ProductOverviewVendor { special_offer, price, .. }|
-                Reverse(special_offer.map(|(deal, _)| deal.discount_average(*price)))
+                Reverse(special_offer.map(|(deal, _)| deal.average_discount(*price)))
             )
         );
     })

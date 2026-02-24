@@ -7,6 +7,7 @@ use crate::database::{
 use dioxus::prelude::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroU32;
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
@@ -54,9 +55,9 @@ pub struct ProductInfo {
     pub updated_at: PrimitiveDateTime,
     /// The average rating of the product.
     pub rating: AverageRating,
-    /// The currently active special offer on the product if any, and whether it only applies to
-    /// members.
-    pub special_offer: Option<(Deal, bool)>,
+    /// The currently active special offer on the product if any, how many times each customer can
+    /// benefit from the deal, and whether it only applies to members.
+    pub special_offer: Option<(Deal, Option<NonZeroU32>, bool)>,
     /// Whether the customer has marked the product as a favorite. Value is unspecified if a
     /// customer ID was not provided.
     pub favorited: bool,
@@ -92,6 +93,7 @@ struct ProductInfoRepr {
     new_price: Option<Decimal>,
     quantity1: Option<i32>,
     quantity2: Option<i32>,
+    limit_per_customer: Option<i32>,
     members_only: Option<bool>,
     vendor_id: RawId,
     vendor_name: String,
@@ -125,6 +127,7 @@ impl ProductInfo {
             quantity1,
             quantity2,
             members_only,
+            limit_per_customer,
             vendor_id,
             vendor_name,
             category_path,
@@ -166,7 +169,20 @@ impl ProductInfo {
                 quantity2,
                 members_only,
                 price,
-            ),
+            )
+            .map(|(deal, members_only)| {
+                (
+                    deal,
+                    limit_per_customer.map(|l| {
+                        u32::try_from(l)
+                            .ok()
+                            .and_then(NonZeroU32::new)
+                            .expect("Database returned non-positive limit.")
+                    }),
+                    members_only,
+                )
+            }),
+
             favorited,
             own_rating: Rating::new(own_rating.map_or(1, |r| {
                 r.try_into().expect("Database returned invalid own rating.")
@@ -197,7 +213,7 @@ pub async fn product_info(
         SELECT name, thumbnail, price, p.description, in_stock, origin,
             gallery AS "gallery: Vec<String>",
             amount_per_unit, measurement_unit, visible, created_at, updated_at,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,
+            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only, aso.limit_per_customer,
             vendors.id AS vendor_id, vendors.display_name AS vendor_name,
             category_path(category) AS "category_path!: Vec<CategoryPathSegment>",
             AVG(ratings.rating::FLOAT) AS average_rating,
@@ -222,7 +238,8 @@ pub async fn product_info(
         JOIN vendors ON vendors.id = vendor
         LEFT JOIN ratings ON ratings.product = p.id
         WHERE p.id = $1
-        GROUP BY p.id, vendors.id, aso.new_price, aso.quantity1, aso.quantity2, aso.members_only
+        GROUP BY p.id, vendors.id,
+            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only, aso.limit_per_customer
         "#,
         customer.map(Id::get),
         product.get()
@@ -253,7 +270,7 @@ pub struct Purchase {
     /// Whether a special offer affected the price.
     pub special_offer_used: bool,
     /// How many units were purchased.
-    pub number: u32,
+    pub number: NonZeroU32,
     /// How much of the product was included in one unit at the time of purchase.
     pub amount_per_unit: Amount,
     /// The name of the product.
@@ -295,9 +312,10 @@ impl From<PurchaseRepr> for Purchase {
         Self {
             paid,
             special_offer_used,
-            number: number
-                .try_into()
-                .expect("Database returned negative number of products in order."),
+            number: u32::try_from(number)
+                .ok()
+                .and_then(NonZeroU32::new)
+                .expect("Database returned non-positive number in order."),
             amount_per_unit: build_amount(amount_per_unit, measurement_unit),
             product_name: product_name.into(),
             thumbnail: thumbnail.into(),

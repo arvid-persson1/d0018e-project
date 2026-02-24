@@ -1,6 +1,5 @@
 //! Types produced by database operations.
 
-use crate::database::{Id, Product};
 use derive_more::{Deref, Display, Into};
 use regex::Regex;
 use rust_decimal::Decimal;
@@ -10,11 +9,10 @@ use sqlx::Type;
 use std::{
     cmp::Ordering,
     fmt::{Display, Error as FmtError, Formatter},
-    num::NonZeroU8,
+    num::{NonZero, NonZeroU8, NonZeroU32},
     sync::LazyLock,
 };
 use thiserror::Error;
-use time::PrimitiveDateTime;
 
 /// URL to an external resource, owned.
 pub type Url = Box<str>;
@@ -84,7 +82,7 @@ impl Amount {
 }
 
 impl PartialOrd for Amount {
-    /// Compares the amounts if their units are equal, otherwise returns `None`.
+    /// Compare the amounts if their units are equal, otherwise returns `None`.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let Self { quantity, unit } = self;
         (*unit == other.unit).then(|| quantity.cmp(&other.quantity))
@@ -108,16 +106,17 @@ impl Display for Amount {
 )]
 // TODO: Derive `Deserialize` manually, disallowing out-of-range values.
 // TODO: Add constant presets.
+#[repr(transparent)]
 pub struct Rating(NonZeroU8);
 
 impl Rating {
-    /// Verifies the rating is in range and constructs a `Rating` on success.
+    /// Verify the rating is in range and constructs a `Rating` on success.
     #[must_use]
     #[expect(clippy::missing_panics_doc, reason = "See note.")]
     pub fn new(r: u8) -> Option<Self> {
         (1..=5).contains(&r).then(|| {
             #[expect(clippy::unwrap_used, reason = "Just verified.")]
-            Self(NonZeroU8::new(r).unwrap())
+            Self(NonZero::new(r).unwrap())
         })
     }
 
@@ -143,14 +142,14 @@ pub struct AverageRating {
 }
 
 impl PartialOrd for AverageRating {
-    /// Compares the ratings, ignoring the counts.
+    /// Compare the ratings, ignoring the counts.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for AverageRating {
-    /// Compares the ratings, ignoring the counts.
+    /// Compare the ratings, ignoring the counts.
     fn cmp(&self, other: &Self) -> Ordering {
         let Self { rating, count: _ } = self;
         #[expect(clippy::unwrap_used, reason = "The rating is known to be real.")]
@@ -159,7 +158,7 @@ impl Ord for AverageRating {
 }
 
 impl PartialEq for AverageRating {
-    /// Compares the ratings, ignoring the counts.
+    /// Compare the ratings, ignoring the counts.
     fn eq(&self, other: &Self) -> bool {
         let Self { rating, count: _ } = self;
         // The rating is known to be real.
@@ -170,7 +169,7 @@ impl PartialEq for AverageRating {
 impl Eq for AverageRating {}
 
 impl AverageRating {
-    /// Verifies the rating is in range and constructs an `AverageRating` on success.
+    /// Verify the rating is in range and constructs an `AverageRating` on success.
     // TODO: Add infallible variant based on `Rating`.
     #[must_use]
     pub fn new(rating: f64, count: u64) -> Option<Self> {
@@ -186,7 +185,7 @@ impl AverageRating {
         }
     }
 
-    /// Returns the average rating if there are any.
+    /// Get the average rating if there are any.
     #[must_use]
     pub const fn rating(self) -> Option<f64> {
         if self.count > 0 {
@@ -196,7 +195,7 @@ impl AverageRating {
         }
     }
 
-    /// Returns the number of ratings.
+    /// Get the number of ratings.
     #[must_use]
     pub const fn count(self) -> u64 {
         self.count
@@ -204,7 +203,7 @@ impl AverageRating {
 }
 
 impl Display for AverageRating {
-    /// Formats the rating with a single decimal point.
+    /// Format the rating with a single decimal point.
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { rating, count } = *self;
         if count > 0 {
@@ -228,10 +227,11 @@ impl Display for AverageRating {
     Debug, Display, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref, Serialize, Deserialize,
 )]
 // TODO: Derive `Deserialize` manually, disallowing invalid values.
+#[repr(transparent)]
 pub struct Username(Box<str>);
 
 impl Username {
-    /// Verifies the format and constructs a `Username` on success.
+    /// Verifiy the format and constructs a `Username` on success.
     pub fn new(s: Box<str>) -> Option<Self> {
         static USERNAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(r"^[\w-]{3,20}$").expect("Failed to compile regex pattern.")
@@ -249,10 +249,11 @@ impl Username {
     Debug, Display, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, Deref, Serialize, Deserialize,
 )]
 // TODO: Derive `Deserialize` manually, disallowing invalid values.
+#[repr(transparent)]
 pub struct Email(Box<str>);
 
 impl Email {
-    /// Verifies the format and constructs an `Email` on success.
+    /// Verifiy the format and constructs an `Email` on success.
     pub fn new(s: Box<str>) -> Option<Self> {
         static EMAIL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(r"^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$").expect("Failed to compile regex pattern.")
@@ -270,6 +271,7 @@ pub const ADMIN_PROFILE_PICTURE: &str = "";
 /// Customers and vendors can set their own profile pictures, while admins always have the same
 /// fixed one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(transparent)]
 pub struct ProfilePicture(Option<Url>);
 
 impl ProfilePicture {
@@ -302,47 +304,26 @@ impl ProfilePicture {
 
 /// Details on the discount of a special offer.
 ///
-/// This type is unaware of what product it belongs to or its pricing, and is therefore unable to
-/// verify that it actually provides a discount. Nevertheless, attempting to insert such a special
-/// offer into the database will result in an error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Deal {
-    /// The price has been reduced.
-    Discount {
-        /// The new price of the product.
-        new_price: Decimal,
-    },
-    /// A "take N pay for M" deal.
-    Batch {
-        /// N; how many products to take.
-        take: u32,
-        /// M; how many products to pay for.
-        pay_for: u32,
-    },
-    /// A "take N pay X" deal.
-    BatchPrice {
-        /// N; how many products to take.
-        take: u32,
-        /// X; how much to pay.
-        pay: Decimal,
-    },
-}
-
-/// Errors created by [`Deal::new`].
-// NOTE: Defensively not `Eq`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
-pub enum DealError {
-    #[error("Invalid type of special offer.")]
-    /// The arguments did not represent a valid type of special offer.
-    InvalidVariant,
-    #[error("Special offer does not provide discount.")]
-    /// The deal did not actually provide a discount. The deal is given anyway in case this was
-    /// expected.
-    NoDiscount(Deal),
-}
+/// Note that although an instance of this type is guaranteed to actually provide a discount at the
+/// time of construction, it might be the case that it no longer does so later due to a price
+/// change in the database. As such, attempting to insert it into the database might still result
+/// in an error.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Into)]
+#[repr(transparent)]
+pub struct Deal(DealImpl);
 
 impl Deal {
-    /// Constructs a new `Deal` from the format used in the database.
+    /// Construct a new `Deal` offering free samples.
+    ///
+    /// Care should be taken to set a limit when inserting this deal into the database.
+    #[must_use]
+    pub const fn free() -> Self {
+        Self(DealImpl::Discount {
+            new_price: Decimal::ZERO,
+        })
+    }
+
+    /// Construct a new `Deal` from the format used in the database.
     ///
     /// The following variants exists:
     /// 1. "NEW PRICE X" (sale) has `new_price` as <code>[Some]\(X)</code>, and both quantities as
@@ -359,20 +340,20 @@ impl Deal {
     /// but does not actually provide a discount compared to the price of the product.
     ///
     /// Silently overflows if either quantity is [`Some`] and negative.
-    pub fn new(
+    pub fn from_repr(
         new_price: Option<Decimal>,
         quantity1: Option<i32>,
         quantity2: Option<i32>,
         base_price: Decimal,
     ) -> Result<Self, DealError> {
-        let deal = Self::try_new(new_price, quantity1, quantity2, base_price)?;
-        deal.ok_or(DealError::InvalidVariant)
+        Self::try_from_repr(new_price, quantity1, quantity2, base_price)?
+            .ok_or(DealError::InvalidVariant)
     }
 
-    /// Constructs a new `Deal` from the format used in the database.
+    /// Construct a new `Deal` from the format used in the database.
     ///
-    /// Unlike [`new`], this returns an <code>[Option]\<Deal\></code>, allowing all fields to be
-    /// [`None`] and then producing [`None`]. See [`new`] for details.
+    /// Unlike [`from_repr`], this returns an <code>[Option]\<Deal\></code>, allowing all fields to
+    /// be [`None`] and then producing [`None`]. See [`from_repr`] for details.
     ///
     /// # Errors
     ///
@@ -380,95 +361,183 @@ impl Deal {
     /// match, or [`NoDiscount`](DealError::NoDiscount) if the deal is structurally valid
     /// but does not actually provide a discount compared to the price of the product.
     ///
-    /// Silently overflows if either quantity is [`Some`] and negative.
-    ///
-    /// [`new`]: Self::new
-    pub fn try_new(
+    /// [`from_repr`]: Self::from_repr
+    pub fn try_from_repr(
         new_price: Option<Decimal>,
         quantity1: Option<i32>,
         quantity2: Option<i32>,
         base_price: Decimal,
     ) -> Result<Option<Self>, DealError> {
-        let deal = match (new_price, quantity1, quantity2) {
-            (Some(new_price), None, None) => Self::Discount { new_price },
-            (None, Some(take), Some(pay_for)) => Self::Batch {
-                take: take as u32,
-                pay_for: pay_for as u32,
+        const ONE: NonZeroU32 = NonZero::new(1).unwrap();
+
+        if base_price <= Decimal::ZERO {
+            return Err(DealError::ZeroPrice);
+        }
+
+        match (new_price, quantity1, quantity2) {
+            (Some(new_price), None, None) => {
+                if new_price < Decimal::ZERO {
+                    Err(DealError::OutOfRange)
+                } else if new_price >= base_price {
+                    Err(DealError::NoDiscount)
+                } else {
+                    Ok(Some(Self(DealImpl::Discount { new_price })))
+                }
             },
-            (Some(pay), Some(take), None) => Self::BatchPrice {
-                pay,
-                take: take as u32,
+            (None, Some(take), Some(pay_for)) => {
+                if take <= pay_for {
+                    Err(DealError::NoDiscount)
+                } else if let Some(take) = u32::try_from(take).ok().and_then(NonZeroU32::new)
+                    && let Some(pay_for) = u32::try_from(pay_for).ok().and_then(NonZeroU32::new)
+                {
+                    Ok(Some(Self(DealImpl::Batch { take, pay_for })))
+                } else {
+                    Err(DealError::OutOfRange)
+                }
             },
-            (None, None, None) => return Ok(None),
-            _ => return Err(DealError::InvalidVariant),
-        };
-        if deal.discount_average(base_price).is_some() {
-            Ok(Some(deal))
-        } else {
-            Err(DealError::NoDiscount(deal))
+            (Some(pay), Some(take), None) => {
+                if pay * Decimal::from(take) >= base_price {
+                    Err(DealError::NoDiscount)
+                } else if let Some(take) = u32::try_from(take).ok().and_then(NonZeroU32::new) {
+                    Ok(Some(Self(if take == ONE {
+                        // Paying X is equivalent to taking 1 and paying X, including when
+                        // considering limits. For consistency, stick to the former.
+                        DealImpl::Discount { new_price: pay }
+                    } else {
+                        DealImpl::BatchPrice { take, pay }
+                    })))
+                } else {
+                    Err(DealError::OutOfRange)
+                }
+            },
+            (None, None, None) => Ok(None),
+            _ => Err(DealError::InvalidVariant),
         }
     }
 
-    /// Converts a `Deal` into the format used in the database.
+    /// Convert a `Deal` into the format used in the database.
     ///
     /// Specifically, this returns a tuple representing the columns  `new_price`, `quantity1` and
     /// `quantity2` respectively on success. If either quantity is greater than `i32::MAX`, `None`
     /// is returned.
     #[must_use]
     pub fn database_repr(self) -> Option<(Option<Decimal>, Option<i32>, Option<i32>)> {
-        match self {
-            Self::Discount { new_price } => Some((Some(new_price), None, None)),
-            Self::Batch { take, pay_for }
-                if let Ok(take) = take.try_into()
-                    && let Ok(pay_for) = pay_for.try_into() =>
+        let Self(deal) = self;
+        match deal {
+            DealImpl::Discount { new_price } => Some((Some(new_price), None, None)),
+            DealImpl::Batch { take, pay_for }
+                if let Ok(take) = take.get().try_into()
+                    && let Ok(pay_for) = pay_for.get().try_into() =>
             {
                 Some((None, Some(take), Some(pay_for)))
             },
-            Self::BatchPrice { take, pay } if let Ok(take) = take.try_into() => {
+            DealImpl::BatchPrice { take, pay } if let Ok(take) = take.get().try_into() => {
                 Some((Some(pay), Some(take), None))
             },
-            Self::Batch { .. } | Self::BatchPrice { .. } => None,
+            DealImpl::Batch { .. } | DealImpl::BatchPrice { .. } => None,
         }
     }
 
-    /// Calculates the discount in percent as average per unit. If the deal doesn't actually offer
-    /// a price reduction, `None` is returned.
+    /// Calculate the discount in percent as average per unit.
+    ///
+    /// If `base_price` is the price used during construction, this value will be between 0 and 1.
+    /// If [`free`](Self::free) was used, this value will be 1.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `base_price` is 0.
     #[must_use]
-    pub fn discount_average(self, base_price: Decimal) -> Option<Decimal> {
-        match self {
-            Self::Discount { new_price } if new_price < base_price => {
-                Some(Decimal::ONE - new_price / base_price)
+    pub fn average_discount(self, base_price: Decimal) -> Decimal {
+        let Self(deal) = self;
+        match deal {
+            DealImpl::Discount { new_price } => Decimal::ONE - new_price / base_price,
+            DealImpl::Batch { take, pay_for } => {
+                Decimal::ONE - Decimal::from(pay_for.get()) / Decimal::from(take.get())
             },
-            Self::Batch { take, pay_for } if take > pay_for => {
-                Some(Decimal::ONE - Decimal::from(pay_for) / Decimal::from(take))
+            DealImpl::BatchPrice { take, pay } => {
+                Decimal::ONE - pay / (base_price * Decimal::from(take.get()))
             },
-            Self::BatchPrice { take, pay }
-                if take > 1
-                    && let take = Decimal::from(take)
-                    && pay * take < base_price =>
-            {
-                Some(Decimal::ONE - pay / (base_price * take))
+        }
+    }
+
+    /// Calculate the price of a bunch of units of a product using this deal.
+    ///
+    /// Returns a tuple (`price`, `uses`) where `price` is the final price after discounts and
+    /// `uses` is how many times the special offer was applied to get that price.
+    #[must_use]
+    pub fn discounted_price(
+        self,
+        units: NonZeroU32,
+        price_per_unit: Decimal,
+        limit: Option<u32>,
+    ) -> (Decimal, u32) {
+        let limit = limit.unwrap_or(u32::MAX);
+        let units = units.get();
+        let Self(deal) = self;
+        match deal {
+            DealImpl::Discount { new_price } => {
+                let uses = limit.min(units);
+                let price = Decimal::from(uses) * (new_price - price_per_unit)
+                    + price_per_unit * Decimal::from(units);
+                (price, uses)
             },
-            Self::Discount { .. } | Self::Batch { .. } | Self::BatchPrice { .. } => None,
+            DealImpl::Batch { take, pay_for } => {
+                let uses = limit.min(units / take);
+                let price =
+                    price_per_unit * Decimal::from(units - uses * (take.get() - pay_for.get()));
+                (price, uses)
+            },
+            DealImpl::BatchPrice { take, pay } => {
+                let uses = limit.min(units / take);
+                let price = pay * Decimal::from(uses)
+                    + price_per_unit * Decimal::from(units - take.get() * uses);
+                (price, uses)
+            },
         }
     }
 }
 
-/// A record of a customer's review, for display on profile.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CustomerReview {
-    /// The ID of the product.
-    pub product: Id<Product>,
-    /// URL to an image of the product.
-    pub thumbnail: Url,
-    /// The name of the product.
-    pub product_name: Box<str>,
-    /// The given rating of the product.
-    pub rating: Rating,
-    /// The title of the review.
-    pub title: Box<str>,
-    /// The content of the review.
-    pub content: Box<str>,
+/// Backing implementation of [`Deal`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+enum DealImpl {
+    /// The price has been reduced.
+    Discount {
+        /// The new price of the product.
+        new_price: Decimal,
+    },
+    /// A "take N pay for M" deal.
+    Batch {
+        /// N; how many products to take.
+        take: NonZeroU32,
+        /// M; how many products to pay for.
+        pay_for: NonZeroU32,
+    },
+    /// A "take N pay X" deal.
+    BatchPrice {
+        /// N; how many products to take.
+        take: NonZeroU32,
+        /// X; how much to pay.
+        pay: Decimal,
+    },
+}
+
+/// Errors created by methods of [`Deal`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+pub enum DealError {
+    /// The provided base price was 0.
+    #[error("Base price must be positive.")]
+    ZeroPrice,
+    /// The new price or a quantity was non-positive. The new price may be 0 only if both
+    /// quantities are [`None`].
+    #[error("New price and quantities must be positive.")]
+    OutOfRange,
+    #[error("Invalid type of special offer.")]
+    /// The arguments did not represent a valid type of special offer.
+    InvalidVariant,
+    #[error("Special offer does not provide discount.")]
+    /// The deal did not result in a discount.
+    /// expected.
+    NoDiscount,
 }
 
 /// A vote on a review or comment.
@@ -491,41 +560,4 @@ pub enum Role {
     Vendor,
     /// The user is a site administrator.
     Administrator,
-}
-
-/// A record of a customer's purchase.
-///
-/// This does not include a timestamp, as they are intended to be grouped by timestamp in an
-/// [`Order`].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Purchase {
-    /// How much was paid.
-    pub paid: Decimal,
-    /// Whether a special offer affected the price.
-    pub special_offer_used: bool,
-    /// How much of the product was included in one unit at the time of purchase.
-    pub amount_per_unit: Amount,
-    /// How many units were purchased.
-    pub number: u32,
-    /// The name of the product.
-    pub product_name: Box<str>,
-    /// URL to an image of the product.
-    pub thumbnail: Url,
-}
-
-/// A completed order.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Order {
-    /// The time of purchase.
-    pub time: PrimitiveDateTime,
-    /// Purchases included in this order.
-    pub purchases: Box<[Purchase]>,
-}
-
-impl Order {
-    /// Calculcates the total price of all purchases in the order.
-    #[must_use]
-    pub fn price(&self) -> Decimal {
-        self.purchases.iter().map(|purchase| purchase.paid).sum()
-    }
 }

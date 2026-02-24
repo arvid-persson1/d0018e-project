@@ -64,7 +64,7 @@ pub async fn create_special_offer(
     .map_err(Into::into)
 }
 
-/// Sets the limit per customer of a special offer.
+/// Set the limit per customer of a special offer.
 ///
 /// This might make it so that some customers have already used the special offer more times
 /// than are allowed by the new limit. These customers are restricted from further usage unless
@@ -95,7 +95,7 @@ pub async fn set_special_offer_limit(
     .by_unique_key(|| todo!())
 }
 
-/// Sets the "members only"-status of a special offer.
+/// Set the "members only"-status of a special offer.
 ///
 /// # Errors
 ///
@@ -121,7 +121,7 @@ pub async fn set_special_offer_members_only(
     .by_unique_key(|| todo!())
 }
 
-/// Sets the start time of a special offer.
+/// Set the start time of a special offer.
 ///
 /// # Errors
 ///
@@ -153,7 +153,7 @@ pub async fn set_special_offer_start(
     .by_unique_key(|| todo!())
 }
 
-/// Sets the start time of a special offer to "now".
+/// Set the start time of a special offer to "now".
 ///
 /// # Errors
 ///
@@ -176,7 +176,7 @@ pub async fn set_special_offer_start_now(special_offer: Id<SpecialOffer>) -> Res
     .by_unique_key(|| todo!())
 }
 
-/// Sets the end time of a special offer.
+/// Set the end time of a special offer.
 ///
 /// Special offers with an end time of `None` must be deleted or otherwise disabled manually.
 ///
@@ -209,7 +209,7 @@ pub async fn set_special_offer_end(
     .by_unique_key(|| todo!())
 }
 
-/// Deletes a special offer.
+/// Delete a special offer.
 ///
 /// # Errors
 ///
@@ -230,13 +230,12 @@ pub async fn delete_special_offer(special_offer: Id<SpecialOffer>) -> Result<()>
     .by_unique_key(|| todo!())
 }
 
-/// Sets the deal of a special offer.
+/// Set the deal of a special offer.
 ///
 /// # Errors
 ///
 /// Fails if:
 /// - `special_offer` is invalid.
-/// - The special offer does not actually provide a discount.
 /// - An error occurs during communication with the database.
 #[server]
 pub async fn set_special_offer_deal(special_offer: Id<SpecialOffer>, deal: Deal) -> Result<()> {

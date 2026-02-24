@@ -42,7 +42,7 @@ fn try_build_special_offer(
     price: Decimal,
 ) -> Option<(Deal, bool)> {
     match (
-        Deal::try_new(new_price, quantity1, quantity2, price)
+        Deal::try_from_repr(new_price, quantity1, quantity2, price)
             .expect("Database returned invalid special offer."),
         members_only,
     ) {

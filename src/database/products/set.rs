@@ -421,7 +421,7 @@ pub async fn set_visibility(product: Id<Product>, visible: bool) -> Result<()> {
     tx.commit().await.map_err(|_err| todo!())
 }
 
-/// Sets the "favorite" status of a product for a customer.
+/// Set the "favorite" status of a product for a customer.
 ///
 /// # Errors
 ///
@@ -460,7 +460,7 @@ pub async fn set_favorite(
     .map_err(Into::into)
 }
 
-/// Sets a customer's rating on a product.
+/// Set a customer's rating on a product.
 ///
 /// # Errors
 ///
@@ -491,7 +491,7 @@ pub async fn set_rating(
     .map_err(Into::into)
 }
 
-/// Removes a customer's rating on a product.
+/// Remove a customer's rating on a product.
 ///
 /// # Errors
 ///

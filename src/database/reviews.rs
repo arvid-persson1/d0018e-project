@@ -570,7 +570,7 @@ pub async fn product_reviews_as(
     Ok((own_review, other_reviews))
 }
 
-/// Creates a review on a product.
+/// Create a review on a product.
 ///
 /// # Errors
 ///
@@ -603,7 +603,7 @@ pub async fn create_review(
     .map_err(Into::into)
 }
 
-/// Updates a review.
+/// Update a review.
 ///
 /// # Errors
 ///
@@ -627,7 +627,7 @@ pub async fn update_review(review: Id<Review>, title: Box<str>, content: Box<str
     .by_unique_key(|| todo!())
 }
 
-/// Deletes a review and all comments on it.
+/// Delete a review and all comments on it.
 ///
 /// As this action cannot be undone and might delete a large number of comments, it should be
 /// associated with a proper warning in the frontend.
@@ -651,7 +651,7 @@ pub async fn delete_review(review: Id<Review>) -> Result<()> {
     .by_unique_key(|| todo!())
 }
 
-/// Creates a comment on a review.
+/// Create a comment on a review.
 ///
 /// # Errors
 ///
@@ -675,7 +675,7 @@ pub async fn create_comment(user: Id<User>, parent: Id<Review>, content: Box<str
     .map_err(Into::into)
 }
 
-/// Creates a comment on another comment.
+/// Create a comment on another comment.
 ///
 /// # Errors
 ///
@@ -699,7 +699,7 @@ pub async fn create_reply(user: Id<User>, parent: Id<Comment>, content: Box<str>
     .map_err(Into::into)
 }
 
-/// Deletes a comment and all replies to it.
+/// Delete a comment and all replies to it.
 ///
 /// # Errors
 ///
@@ -720,7 +720,7 @@ pub async fn delete_comment(comment: Id<Comment>) -> Result<()> {
     .by_unique_key(|| todo!())
 }
 
-/// Sets the customer's vote status on a review. Setting `vote = None` removes the vote.
+/// Set the customer's vote status on a review. Setting `vote = None` removes the vote.
 ///
 /// # Errors
 ///
@@ -764,7 +764,7 @@ pub async fn set_vote_review(
     }
 }
 
-/// Sets the customer's vote status on a comment. Setting `vote = None` removes the vote.
+/// Set the customer's vote status on a comment. Setting `vote = None` removes the vote.
 ///
 /// # Errors
 ///
@@ -812,17 +812,17 @@ pub async fn set_vote_comment(
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CustomerReview {
     /// The product the review belongs to.
-    product: Id<Product>,
+    pub product: Id<Product>,
     /// The name of the product.
-    product_name: Box<str>,
+    pub product_name: Box<str>,
     /// The thumbnail of the product.
-    thumbnail: Url,
+    pub thumbnail: Url,
     /// The rating associated with the review.
-    rating: Rating,
+    pub rating: Rating,
     /// The title of the review.
-    title: Box<str>,
+    pub title: Box<str>,
     /// The content of the review.
-    content: Box<str>,
+    pub content: Box<str>,
 }
 
 #[cfg(feature = "server")]

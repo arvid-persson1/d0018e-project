@@ -143,7 +143,7 @@ pub async fn delete_user(user: Id<User>) -> Result<()> {
     tx.commit().await.map_err(|_err| todo!())
 }
 
-/// Sets a customer's profile picture.
+/// Set a customer's profile picture.
 ///
 /// # Errors
 ///
@@ -166,7 +166,7 @@ pub async fn set_customer_profile_picture(customer: Id<Customer>, url: Url) -> R
     .by_unique_key(|| todo!())
 }
 
-/// Sets a vendor's profile picture.
+/// Set a vendor's profile picture.
 ///
 /// # Errors
 ///
@@ -189,7 +189,7 @@ pub async fn set_vendor_profile_picture(vendor: Id<Vendor>, url: Url) -> Result<
     .by_unique_key(|| todo!())
 }
 
-/// Sets a user's username.
+/// Set a user's username.
 ///
 /// # Errors
 ///
@@ -213,7 +213,7 @@ pub async fn set_username(user: Id<User>, username: Username) -> Result<()> {
     .by_unique_key(|| todo!())
 }
 
-/// Sets a user's email.
+/// Set a user's email.
 ///
 /// # Errors
 ///
@@ -237,7 +237,7 @@ pub async fn set_email(user: Id<User>, email: Email) -> Result<()> {
     .by_unique_key(|| todo!())
 }
 
-/// Sets a vendor's display name.
+/// Set a vendor's display name.
 ///
 /// # Errors
 ///
@@ -260,7 +260,7 @@ pub async fn set_vendor_display_name(vendor: Id<Vendor>, display_name: Box<str>)
     .by_unique_key(|| todo!())
 }
 
-/// Sets a vendor's description.
+/// Set a vendor's description.
 ///
 /// # Errors
 ///

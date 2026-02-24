@@ -8,7 +8,7 @@ use {
     sqlx::query,
 };
 
-/// Puts `number` units of a product in a customer's shopping cart, *overriding any number
+/// Put `number` units of a product in a customer's shopping cart, *overriding any number
 /// already there*. Setting `number = 0` removes the product from the shopping cart.
 ///
 /// # Errors
@@ -57,7 +57,7 @@ pub async fn set_in_shopping_cart(
     }
 }
 
-/// Removes all products from a customer's cart that have been deleted since addition to the cart.
+/// Remove all products from a customer's cart that have been deleted since addition to the cart.
 ///
 /// # Errors
 ///
@@ -79,7 +79,7 @@ pub async fn remove_deleted_from_cart(customer: Id<Customer>) -> Result<()> {
     .map_err(Into::into)
 }
 
-/// Completes an order for a customer, emptying their shopping cart.
+/// Complete an order for a customer, emptying their shopping cart.
 ///
 /// # Errors
 ///
