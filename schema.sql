@@ -1,3 +1,7 @@
+-- This is an open copy of the database schema. It is NOT included in any form of build script, CI
+-- or validation, so changes here are not automatically reflected in the actual database. Rather,
+-- this is meant as a form of documentation of the database schema manually kept up-to-date.
+
 CREATE EXTENSION citext;
 CREATE EXTENSION pg_cron;
 
@@ -41,6 +45,8 @@ CREATE TABLE users (
 
     -- NOTE: Currently, no data is deleted from other tables when a user is marked as deleted.
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    -- NOTE: There is no administrators table, since administrators do not need any information
+    -- beyond what any user already has. For example, they share a common profile picture.
     role ROLE NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- This column can't be automatically generated as it has to be written to by triggers when
@@ -285,13 +291,13 @@ CREATE TRIGGER categories_valid_tree
 AFTER INSERT OR UPDATE OF parent ON categories
 FOR EACH ROW EXECUTE FUNCTION categories_validate_tree();
 
+CREATE INDEX categories_by_parent_name ON categories (parent NULLS FIRST, name);
+
 CREATE TABLE products (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     thumbnail URL NOT NULL,
     gallery URL[] NOT NULL,
-    -- Domain is NOT restricted to positive values only, as a special offer could for example give
-    -- away a product for free (with limited uses).
     price TWOPOINT_UDEC NOT NULL CHECK (price > 0),
     overview TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -317,6 +323,13 @@ CREATE TRIGGER products_update_time
 BEFORE UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
+CREATE INDEX visible_products_by_time ON products (created_at DESC)
+WHERE visible AND in_stock > 0;
+
+CREATE INDEX products_by_vendor ON products (vendor);
+
+CREATE INDEX products_by_category ON products (category);
+
 CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -341,8 +354,8 @@ SELECT *
 FROM special_offers
 WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
 
--- There is no technical reason why there couldn't be several active special offers: the price
--- calculator would just have to choose the better price.
+-- There is no technical or logical reason why there couldn't be several active special offers: the
+-- price calculator would just have to choose the better price.
 CREATE FUNCTION offers_deny_overlap() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
 BEGIN
@@ -445,6 +458,9 @@ CREATE TRIGGER products_valid_discounts
 BEFORE UPDATE OF price ON products
 FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
 
+-- Can't make partial to active offers as that depends on the time.
+CREATE INDEX offers_by_product ON special_offers (product);
+
 -- NOTE: It is possible for a customer to have used a special offer more times than the limit
 -- allows due to the limit having changed. Similarly, it is possible for a non-member to have used
 -- members-only special offer due to the status of the latter having changed. These are not errors
@@ -471,6 +487,7 @@ SELECT *
 FROM expiries
 WHERE processed_at IS NULL AND expiry <= CURRENT_DATE;
 
+-- PERF: Not currently supported by an index.
 CREATE FUNCTION process_expiries() RETURNS TABLE (
     product INT,
     -- NOTE: This is the naive sum of the listed number of expiries. It could be the case that
@@ -479,9 +496,9 @@ CREATE FUNCTION process_expiries() RETURNS TABLE (
     total BIGINT
 ) LANGUAGE sql VOLATILE AS $$
     WITH product_lock AS (
-        SELECT DISTINCT product
-        FROM pending_expiries
-        JOIN products ON products.id = pending_expiries.product
+        SELECT id
+        FROM products
+        JOIN pending_expiries ON pending_expiries.product = products.id
         FOR UPDATE OF products
     ),
     processed AS (
@@ -529,6 +546,21 @@ CREATE TABLE ratings (
     PRIMARY KEY (product, customer)
 );
 
+CREATE FUNCTION rater_has_purchase() RETURNS TRIGGER
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM orders WHERE customer = NEW.customer AND product = NEW.product) THEN
+        RAISE EXCEPTION 'Customer must have previously bought the product to rate it.';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER validate_rater
+BEFORE INSERT OR UPDATE OF customer, product ON ratings
+FOR EACH ROW EXECUTE FUNCTION rater_has_purchase();
+
 CREATE TABLE reviews (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -565,20 +597,9 @@ CREATE TRIGGER validate_reviewer
 BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 
-CREATE FUNCTION reviewer_has_purchase() RETURNS TRIGGER
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orders WHERE customer = NEW.customer AND product = NEW.product) THEN
-        RAISE EXCEPTION 'Reviewer must have previously bought the product.';
-    END IF;
+CREATE INDEX reviews_by_customer_update ON reviews (customer, updated_at DESC);
 
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER validate_reviewer_purchase
-BEFORE INSERT OR UPDATE OF customer, product ON reviews
-FOR EACH ROW EXECUTE FUNCTION reviewer_has_purchase();
+CREATE INDEX reviews_by_product ON reviews (product);
 
 CREATE TABLE review_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -643,7 +664,7 @@ BEFORE INSERT OR UPDATE OF parent, review ON comments
 FOR EACH ROW EXECUTE FUNCTION comment_parent_same_review();
 
 CREATE FUNCTION comments_validate_tree() RETURNS TRIGGER
-LANGUAGE plgpgsql STABLE AS $$
+LANGUAGE plpgsql STABLE AS $$
 DECLARE
     visited INT[] := ARRAY[NEW.id];
     current_id INT := NEW.parent;
@@ -666,6 +687,8 @@ $$;
 CREATE TRIGGER comments_valid_tree
 BEFORE INSERT OR UPDATE OF parent ON comments
 FOR EACH ROW EXECUTE FUNCTION comments_validate_tree();
+
+CREATE INDEX comments_by_review_parent ON comments (review, parent NULLS FIRST);
 
 CREATE TABLE comment_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -707,7 +730,7 @@ CREATE TABLE customer_favorites (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (customer, product)
+    PRIMARY KEY (product, customer)
 );
 
 CREATE TRIGGER favorites_creation_time
@@ -740,4 +763,6 @@ CREATE TABLE orders (
     CONSTRAINT valid_without_unit CHECK (measurement_unit IS NOT NULL OR amount_per_unit % 1 = 0)
 );
 
--- TODO: Indices.
+CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
+
+CREATE INDEX orders_by_customer_product ON orders (customer, product);
