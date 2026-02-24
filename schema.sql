@@ -12,7 +12,7 @@ CREATE DOMAIN USERNAME AS TEXT CONSTRAINT valid_username CHECK (
 
 -- NOTE: This is the HTML5 specification, specifically incompatible with RFC5322.
 CREATE DOMAIN EMAIL AS citext CONSTRAINT valid_email CHECK (
-    value ~ '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+    VALUE ~ '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
 );
 
 CREATE DOMAIN NONFUTURE_TIMESTAMP AS TIMESTAMP CHECK (VALUE <= CURRENT_TIMESTAMP);
