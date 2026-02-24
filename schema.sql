@@ -3,6 +3,7 @@
 -- this is meant as a form of documentation of the database schema manually kept up-to-date.
 
 CREATE EXTENSION citext;
+CREATE EXTENSION btree_gist;
 CREATE EXTENSION pg_cron;
 
 CREATE DOMAIN USERNAME AS TEXT CONSTRAINT valid_username CHECK (
@@ -323,12 +324,10 @@ CREATE TRIGGER products_update_time
 BEFORE UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
+CREATE INDEX products_by_vendor ON products (vendor);
+CREATE INDEX products_by_category ON products (category);
 CREATE INDEX visible_products_by_time ON products (created_at DESC)
 WHERE visible AND in_stock > 0;
-
-CREATE INDEX products_by_vendor ON products (vendor);
-
-CREATE INDEX products_by_category ON products (category);
 
 CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -346,36 +345,20 @@ CREATE TABLE special_offers (
     -- 3. "TAKE `quantity1` PAY `new_price`" has `quantity2` as `NULL`.
     new_price TWOPOINT_UDEC,
     quantity1 INT CHECK (quantity1 IS NULL OR quantity1 > 1),
-    quantity2 INT CHECK (quantity2 IS NULL OR quantity2 >= 1)
+    quantity2 INT CHECK (quantity2 IS NULL OR quantity2 >= 1),
+
+    -- There is no technical or logical reason why there couldn't be several active special offers:
+    -- the  price calculator would just have to choose the better price.
+    CONSTRAINT no_overlap EXCLUDE USING gist (
+        product WITH =,
+        tsrange(valid_from, valid_until) WITH &&
+    )
 );
 
 CREATE VIEW active_special_offers AS
 SELECT *
 FROM special_offers
 WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
-
--- There is no technical or logical reason why there couldn't be several active special offers: the
--- price calculator would just have to choose the better price.
-CREATE FUNCTION offers_deny_overlap() RETURNS TRIGGER
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM special_offers
-        WHERE id != NEW.id
-        AND product = NEW.product
-        AND tsrange(valid_from, valid_until, '[)') && tsrange(NEW.valid_from, NEW.valid_until, '[)')
-    ) THEN
-        RAISE EXCEPTION 'Attempted to create overlapping special offers. Consider deactivating one.';
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER offers_no_overlap
-BEFORE INSERT OR UPDATE OF product, valid_from, valid_until ON special_offers
-FOR EACH ROW EXECUTE FUNCTION offers_deny_overlap();
 
 CREATE FUNCTION offers_discount(
     base_price products.price%TYPE,
@@ -520,6 +503,8 @@ CREATE FUNCTION process_expiries() RETURNS TABLE (
     RETURNING products.id, counts.total
 $$;
 
+CREATE INDEX expiries_by_product ON expiries (product);
+
 -- WARN: Only actually runs at midnight. If the database is down at that time, expiries will be
 -- missed. Hence, call this function on establishing a connection to the database. If this is done,
 -- there will be no issues with data integrity as the downage would also prevent orders from being
@@ -598,7 +583,6 @@ BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
 
 CREATE INDEX reviews_by_customer_update ON reviews (customer, updated_at DESC);
-
 CREATE INDEX reviews_by_product ON reviews (product);
 
 CREATE TABLE review_votes (
@@ -764,5 +748,4 @@ CREATE TABLE orders (
 );
 
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
-
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
