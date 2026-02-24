@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT name, thumbnail, price, p.description, in_stock, origin,\n            gallery AS \"gallery: Vec<String>\",\n            amount_per_unit, measurement_unit, visible, created_at, updated_at,\n            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,\n            vendors.id AS vendor_id, vendors.display_name AS vendor_name,\n            category_path(category) AS \"category_path!: Vec<CategoryPathSegment>\",\n            AVG(ratings.rating::FLOAT) AS average_rating,\n            COUNT(ratings.rating) AS rating_count,\n            EXISTS(\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1\n                  AND cf.product = p.id\n            ) AS favorited,\n            (\n                SELECT rating\n                FROM ratings\n                WHERE customer = $1 AND product = $2\n            ) AS own_rating\n        FROM products p\n        LEFT JOIN active_special_offers aso ON aso.product = p.id\n        JOIN vendors ON vendors.id = vendor\n        LEFT JOIN ratings ON ratings.product = p.id\n        WHERE p.id = $1\n        GROUP BY p.id, vendors.id, aso.new_price, aso.quantity1, aso.quantity2, aso.members_only\n        ",
+  "query": "\n        SELECT name, thumbnail, price, p.description, in_stock, origin,\n            gallery AS \"gallery: Vec<String>\",\n            amount_per_unit, measurement_unit, visible, created_at, updated_at,\n            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,\n            vendors.id AS vendor_id, vendors.display_name AS vendor_name,\n            category_path(category) AS \"category_path!: Vec<CategoryPathSegment>\",\n            AVG(ratings.rating::FLOAT) AS average_rating,\n            COUNT(ratings.rating) AS rating_count,\n            EXISTS(\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\",\n            (\n                SELECT rating\n                FROM ratings\n                WHERE customer = $1 AND product = $2\n            ) AS own_rating,\n            EXISTS(\n                SELECT 1\n                FROM orders\n                WHERE customer = $1 AND product = $2\n            ) AS \"has_purchased!\"\n        FROM products p\n        LEFT JOIN active_special_offers aso ON aso.product = p.id\n        JOIN vendors ON vendors.id = vendor\n        LEFT JOIN ratings ON ratings.product = p.id\n        WHERE p.id = $1\n        GROUP BY p.id, vendors.id, aso.new_price, aso.quantity1, aso.quantity2, aso.members_only\n        ",
   "describe": {
     "columns": [
       {
@@ -147,13 +147,18 @@
       },
       {
         "ordinal": 21,
-        "name": "favorited",
+        "name": "favorited!",
         "type_info": "Bool"
       },
       {
         "ordinal": 22,
         "name": "own_rating",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 23,
+        "name": "has_purchased!",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -185,8 +190,9 @@
       null,
       null,
       null,
+      null,
       null
     ]
   },
-  "hash": "f835ee6ca385d68ae016eef456966964dc1a6011824f1ab79d8979e60aa2061e"
+  "hash": "c8b8061e75503ad853afddc25a79fe07c41e4ae0bcdd31c528cdf378f68d3799"
 }

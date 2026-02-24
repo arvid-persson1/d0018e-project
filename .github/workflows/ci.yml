@@ -97,4 +97,4 @@ jobs:
           toolchain: nightly
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall sqlx-cli
-      - run: cargo sqlx prepare --check
+      - run: cargo sqlx prepare --check -- -F server

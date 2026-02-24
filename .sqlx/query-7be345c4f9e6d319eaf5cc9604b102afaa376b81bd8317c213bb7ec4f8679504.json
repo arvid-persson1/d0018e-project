@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,\n            vendors.display_name AS vendor_name,\n            EXISTS(\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1\n                  AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        LEFT JOIN active_special_offers aso ON aso.product = p.id\n        JOIN vendors ON vendors.id = p.vendor\n        WHERE visible\n          AND category = $2\n          AND in_stock > 0\n          AND p.id != $3\n        ORDER BY offers_discount(price, aso.new_price, aso.quantity1, aso.quantity2) DESC\n        LIMIT $4\n        OFFSET $5\n        ",
+  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,\n            EXISTS(\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        LEFT JOIN active_special_offers aso ON aso.product = p.id\n        WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0\n        ORDER BY offers_discount(p.price, aso.new_price, aso.quantity1, aso.quantity2) DESC, p.name\n        LIMIT $3\n        OFFSET $4\n        ",
   "describe": {
     "columns": [
       {
@@ -70,11 +70,6 @@
       },
       {
         "ordinal": 13,
-        "name": "vendor_name",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 14,
         "name": "favorited!",
         "type_info": "Bool"
       }
@@ -83,9 +78,9 @@
       "Left": [
         "Int4",
         "Int4",
-        "Int4",
         "Int8",
-        "Int8"
+        "Int8",
+        "Bool"
       ]
     },
     "nullable": [
@@ -102,9 +97,8 @@
       true,
       true,
       true,
-      false,
       null
     ]
   },
-  "hash": "fd289b0a03e8879768b4fb2af19f819fc349ec74812449175c86807ae241a217"
+  "hash": "7be345c4f9e6d319eaf5cc9604b102afaa376b81bd8317c213bb7ec4f8679504"
 }

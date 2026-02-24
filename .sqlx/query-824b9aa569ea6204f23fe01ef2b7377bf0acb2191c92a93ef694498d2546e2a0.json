@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO shopping_cart_items (customer, product, number)\n            VALUES ($1, $2, $3::INT)\n            ON CONFLICT (customer, product) DO UPDATE\n            SET number = EXCLUDED.number\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "824b9aa569ea6204f23fe01ef2b7377bf0acb2191c92a93ef694498d2546e2a0"
+}

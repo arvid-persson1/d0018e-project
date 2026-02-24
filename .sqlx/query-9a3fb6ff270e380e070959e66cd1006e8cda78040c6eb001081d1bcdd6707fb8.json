@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE products\n        SET gallery = $2::TEXT[]\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9a3fb6ff270e380e070959e66cd1006e8cda78040c6eb001081d1bcdd6707fb8"
+}

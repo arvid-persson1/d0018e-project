@@ -1,5 +1,6 @@
 allow-exact-repetitions = true
 check-private-items = true
+doc-valid-idents = ["..", "SQLx"]
 enforce-iter-loop-reborrow = true
 enum-variant-name-threshold = 1
 excessive-nesting-threshold = 5

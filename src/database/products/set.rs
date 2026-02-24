@@ -9,10 +9,11 @@ use time::Date;
 use {
     crate::database::{QueryResultExt, connection},
     sqlx::{query, query_as},
-    std::num::NonZeroI32,
 };
 
 /// Create a new product.
+///
+/// Note that `additions` contains [`String`]s, not [`Url`]s. This is due to a limitation in SQLx.
 ///
 /// # Errors
 ///
@@ -25,7 +26,7 @@ pub async fn create_product(
     vendor: Id<Vendor>,
     name: Box<str>,
     thumbnail: Url,
-    gallery: Box<[Url]>,
+    gallery: Box<[String]>,
     price: Decimal,
     overview: Box<str>,
     description: Box<str>,
@@ -39,18 +40,21 @@ pub async fn create_product(
             vendor, name, thumbnail, gallery, price, overview, description,
             origin, category, amount_per_unit, measurement_unit
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES (
+            $1, $2, $3::TEXT, $4::TEXT[], $5::DECIMAL(10, 2), $6, $7,
+            $8, $9, $10::DECIMAL(10, 2), $11
+        )
         ",
         vendor.get(),
         &name,
-        thumbnail as _,
-        &*gallery as _,
-        price as _,
+        &thumbnail,
+        &*gallery,
+        price,
         &overview,
         &description,
         &origin,
         category.get(),
-        amount.quantity() as _,
+        amount.quantity(),
         amount.unit(),
     )
     .execute(connection())
@@ -94,11 +98,11 @@ pub async fn set_thumbnail(product: Id<Product>, url: Url) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET thumbnail = $2
+        SET thumbnail = $2::TEXT
         WHERE id = $1
         ",
         product.get(),
-        url as _,
+        &url,
     )
     .execute(connection())
     .await?
@@ -121,7 +125,7 @@ pub async fn gallery(product: Id<Product>) -> Result<Box<[Url]>> {
     query_as!(
         GalleryRepr,
         r#"
-        SELECT gallery AS "gallery: _"
+        SELECT gallery AS "gallery: Vec<Url>"
         FROM products
         WHERE id = $1
         "#,
@@ -135,21 +139,23 @@ pub async fn gallery(product: Id<Product>) -> Result<Box<[Url]>> {
 
 /// Set the gallery of a product.
 ///
+/// Note that `additions` contains [`String`]s, not [`Url`]s. This is due to a limitation in SQLx.
+///
 /// # Errors
 ///
 /// Fails if:
 /// - `product` is invalid.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn set_gallery(product: Id<Product>, gallery: Box<[Url]>) -> Result<()> {
+pub async fn set_gallery(product: Id<Product>, gallery: Box<[String]>) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET gallery = $2
+        SET gallery = $2::TEXT[]
         WHERE id = $1
         ",
         product.get(),
-        &*gallery as _,
+        &*gallery,
     )
     .execute(connection())
     .await?
@@ -158,21 +164,23 @@ pub async fn set_gallery(product: Id<Product>, gallery: Box<[Url]>) -> Result<()
 
 /// Append to the gallery of a product.
 ///
+/// Note that `additions` contains [`String`]s, not [`Url`]s. This is due to a limitation in SQLx.
+///
 /// # Errors
 ///
 /// Fails if:
 /// - `product` is invalid.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn add_to_gallery(product: Id<Product>, additions: Box<[Url]>) -> Result<()> {
+pub async fn add_to_gallery(product: Id<Product>, additions: Box<[String]>) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET gallery = gallery || $2
+        SET gallery = gallery || $2::TEXT[]
         WHERE id = $1
         ",
         product.get(),
-        &*additions as _,
+        &*additions,
     )
     .execute(connection())
     .await?
@@ -192,11 +200,11 @@ pub async fn set_price(product: Id<Product>, price: Decimal) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET price = $2
+        SET price = $2::DECIMAL(10, 2)
         WHERE id = $1
         ",
         product.get(),
-        price as _,
+        price,
     )
     .execute(connection())
     .await?
@@ -284,11 +292,11 @@ pub async fn set_amount(product: Id<Product>, amount: Amount) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET amount_per_unit = $2, measurement_unit = $3
+        SET amount_per_unit = $2::DECIMAL(10, 2), measurement_unit = $3
         WHERE id = $1
         ",
         product.get(),
-        amount.quantity() as _,
+        amount.quantity(),
         amount.unit(),
     )
     .execute(connection())
@@ -357,11 +365,11 @@ pub async fn add_stock(
     query!(
         "
         INSERT INTO expiries (product, expiry, number)
-        VALUES ($1, $2, $3)
+        VALUES ($1, $2, $3::INT)
         ",
         product.get(),
-        expiry as _,
-        number as _,
+        expiry,
+        number,
     )
     .execute(&mut *tx)
     .await?
@@ -397,6 +405,7 @@ pub async fn set_visibility(product: Id<Product>, visible: bool) -> Result<()> {
     .await?
     .by_unique_key(|| todo!())?;
 
+    // PERF: Not currently supported by an index.
     query!(
         "
         UPDATE shopping_cart_items
@@ -464,16 +473,17 @@ pub async fn set_rating(
     product: Id<Product>,
     rating: Rating,
 ) -> Result<()> {
+    #[expect(clippy::non_zero_suggestions, reason = "SQLx expects primitive.")]
     query!(
         "
         INSERT INTO ratings (customer, product, rating)
-        VALUES ($1, $2, $3)
+        VALUES ($1, $2, $3::INT)
         ON CONFLICT (customer, product) DO UPDATE
         SET rating = EXCLUDED.rating
         ",
         customer.get(),
         product.get(),
-        NonZeroI32::from(rating.get()) as _,
+        i32::from(rating.get().get()),
     )
     .execute(connection())
     .await

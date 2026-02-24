@@ -11,6 +11,7 @@ use {
 };
 
 #[cfg(feature = "server")]
+// Names are unique so IDs will never be compared.
 #[derive(PartialEq, PartialOrd)]
 struct CategoryRepr {
     parent: Option<RawId>,
@@ -60,13 +61,14 @@ fn build_tree(
 pub async fn category_trees() -> Result<Box<[CategoryTree]>> {
     let categories = query_as!(
         CategoryRepr,
-        "SELECT *
+        "
+        SELECT *
         FROM categories
-        ORDER BY parent NULLS FIRST, NAME",
+        ORDER BY parent NULLS FIRST, name
+        ",
     )
     .fetch_all(connection())
     .await?;
-    // Ordering defined by order of fields. Names are unique so IDs will never be compared.
     debug_assert!(categories.is_sorted(), "Rows not sorted.");
 
     let mut roots = Vec::new();
@@ -90,11 +92,22 @@ pub async fn category_trees() -> Result<Box<[CategoryTree]>> {
             .push((id.into(), name.into()));
     }
 
-    // TODO: Verify sorted output.
-    Ok(roots
+    let trees = roots
         .into_iter()
         .map(|(id, name)| build_tree(id, name, &mut by_parent))
-        .collect())
+        .collect::<Box<_>>();
+
+    debug_assert!({
+        fn categories_sorted(categories: &[CategoryTree]) -> bool {
+            categories.is_sorted_by_key(|c| &c.name)
+                && categories
+                    .iter()
+                    .all(|c| categories_sorted(&c.subcategories))
+        }
+        categories_sorted(&trees)
+    });
+
+    Ok(trees)
 }
 
 /// Create a category.

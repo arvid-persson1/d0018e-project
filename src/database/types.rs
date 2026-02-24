@@ -136,7 +136,7 @@ impl Rating {
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 // TODO: Derive `Deserialize` manually, disallowing out-of-range values.
 pub struct AverageRating {
-    /// The average rating, unspecified if `count` is 0.
+    /// The average rating, unspecified if `count == 0`.
     rating: f64,
     /// The number of ratings contributing to the score.
     count: u64,
@@ -511,13 +511,6 @@ pub struct Purchase {
     pub product_name: Box<str>,
     /// URL to an image of the product.
     pub thumbnail: Url,
-    // TODO: Some of these fields might not be used in the frontend and should then be removed.
-    /// A short description of the proudct,
-    pub product_overview: Box<str>,
-    /// The origin of the product. This may or may not be the name of a country.
-    pub product_origin: Box<str>,
-    /// The name of the vendor.
-    pub vendor_name: Box<str>,
 }
 
 /// A completed order.

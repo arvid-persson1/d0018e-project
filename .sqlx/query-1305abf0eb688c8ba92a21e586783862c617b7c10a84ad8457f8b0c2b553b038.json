@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT r.id, r.customer, username, profile_picture AS \"profile_picture!\", rating, r.created_at, r.updated_at, title, content,\n            SUM(CASE review_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END) AS \"sum_votes!\"\n        FROM reviews r\n        JOIN users ON users.id = r.customer\n        JOIN customers ON customers.id = r.customer\n        JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer\n        LEFT JOIN review_votes ON review_votes.review = r.id\n        WHERE r.product = $1\n        GROUP BY r.id, username, profile_picture, rating\n        ORDER BY \"sum_votes!\" DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "query": "\n        SELECT r.id, r.customer, username, profile_picture AS \"profile_picture!\", rating,\n            r.created_at, r.updated_at, title, content,\n            COALESCE(SUM(CASE review_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END), 0) AS \"sum_votes!\"\n        FROM reviews r\n        JOIN users ON users.id = r.customer\n        JOIN customers ON customers.id = r.customer\n        JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer\n        LEFT JOIN review_votes ON review_votes.review = r.id\n        WHERE r.product = $1\n        GROUP BY r.id, username, profile_picture, rating\n        ORDER BY \"sum_votes!\" DESC\n        LIMIT $2\n        OFFSET $3\n        ",
   "describe": {
     "columns": [
       {
@@ -74,5 +74,5 @@
       null
     ]
   },
-  "hash": "7c261bd85570cab76817eb0920e733162f4adf0fe07686258fca8506f33891ed"
+  "hash": "1305abf0eb688c8ba92a21e586783862c617b7c10a84ad8457f8b0c2b553b038"
 }

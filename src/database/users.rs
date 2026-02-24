@@ -24,6 +24,9 @@ pub async fn delete_user(user: Id<User>) -> Result<()> {
     let user = user.get();
     let mut tx = connection().begin().await?;
 
+    // PERF: Several of these queries are not supported by indices: we imagine account deletions
+    // are rare.
+
     // NOTE: Soft deletion. Possible corresponding row in role-specific table is also kept.
     query!(
         "
@@ -152,11 +155,11 @@ pub async fn set_customer_profile_picture(customer: Id<Customer>, url: Url) -> R
     query!(
         "
         UPDATE customers
-        SET profile_picture = $2
+        SET profile_picture = $2::TEXT
         WHERE id = $1
         ",
         customer.get(),
-        url as _,
+        &url,
     )
     .execute(connection())
     .await?
@@ -175,11 +178,11 @@ pub async fn set_vendor_profile_picture(vendor: Id<Vendor>, url: Url) -> Result<
     query!(
         "
         UPDATE vendors
-        SET profile_picture = $2
+        SET profile_picture = $2::TEXT
         WHERE id = $1
         ",
         vendor.get(),
-        url as _,
+        &url,
     )
     .execute(connection())
     .await?
@@ -199,11 +202,11 @@ pub async fn set_username(user: Id<User>, username: Username) -> Result<()> {
     query!(
         "
         UPDATE users
-        SET username = $2
+        SET username = $2::TEXT
         WHERE id = $1
         ",
         user.get(),
-        *username as _,
+        &*username,
     )
     .execute(connection())
     .await?
@@ -223,11 +226,11 @@ pub async fn set_email(user: Id<User>, email: Email) -> Result<()> {
     query!(
         "
         UPDATE users
-        SET email = $2
+        SET email = $2::CITEXT
         WHERE id = $1
         ",
         user.get(),
-        *email as _,
+        &*email,
     )
     .execute(connection())
     .await?

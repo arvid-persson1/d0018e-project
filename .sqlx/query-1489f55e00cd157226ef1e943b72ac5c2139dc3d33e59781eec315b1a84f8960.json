@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO special_offers (\n            product, members_only, limit_per_customer, valid_from, valid_until,\n            new_price, quantity1, quantity2\n        )\n        VALUES ($1, $2, $3::INT, $4, $5, $6::DECIMAL(10, 2), $7, $8)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bool",
+        "Int4",
+        "Timestamp",
+        "Timestamp",
+        "Numeric",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1489f55e00cd157226ef1e943b72ac5c2139dc3d33e59781eec315b1a84f8960"
+}

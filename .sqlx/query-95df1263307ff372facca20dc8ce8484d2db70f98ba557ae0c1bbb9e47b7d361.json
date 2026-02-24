@@ -6,7 +6,7 @@
       {
         "ordinal": 0,
         "name": "process_expiries",
-        "type_info": "Void"
+        "type_info": "Record"
       }
     ],
     "parameters": {

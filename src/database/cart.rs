@@ -40,15 +40,13 @@ pub async fn set_in_shopping_cart(
         query!(
             "
             INSERT INTO shopping_cart_items (customer, product, number)
-            VALUES ($1, $2, $3)
+            VALUES ($1, $2, $3::INT)
             ON CONFLICT (customer, product) DO UPDATE
             SET number = EXCLUDED.number
             ",
             customer.get(),
             product.get(),
-            // It has already been verified that the number is nonnegative and nonzero, so
-            // positive.
-            number as _,
+            number,
         )
         .execute(connection())
         .await

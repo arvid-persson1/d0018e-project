@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT *\n        FROM categories\n        ORDER BY parent NULLS FIRST, NAME",
+  "query": "\n        SELECT *\n        FROM categories\n        ORDER BY parent NULLS FIRST, name\n        ",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       true
     ]
   },
-  "hash": "aaf023632e7ed8e14fa68ddabf6f7b7fc428178c758f53f1fb82956fb7323816"
+  "hash": "884dc4bd4a5ba9ccad5ccc4ff38151e1dc298a61a84ff5c6f8e337e535252807"
 }

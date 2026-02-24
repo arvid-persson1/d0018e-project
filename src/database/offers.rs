@@ -45,16 +45,16 @@ pub async fn create_special_offer(
             product, members_only, limit_per_customer, valid_from, valid_until,
             new_price, quantity1, quantity2
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3::INT, $4, $5, $6::DECIMAL(10, 2), $7, $8)
         ",
         product.get(),
         members_only,
         limit_per_customer
             .map(|l| i32::try_from(l.get()))
-            .transpose()? as _,
+            .transpose()?,
         valid_from,
         valid_until,
-        new_price as _,
+        new_price,
         quantity1,
         quantity2,
     )
@@ -84,11 +84,11 @@ pub async fn set_special_offer_limit(
     query!(
         "
         UPDATE special_offers
-        SET limit_per_customer = $2
+        SET limit_per_customer = $2::INT
         WHERE id = $1
         ",
         special_offer.get(),
-        i32::try_from(limit_per_customer.get())? as _,
+        i32::try_from(limit_per_customer.get())?,
     )
     .execute(connection())
     .await?
@@ -245,11 +245,11 @@ pub async fn set_special_offer_deal(special_offer: Id<SpecialOffer>, deal: Deal)
     query!(
         "
         UPDATE special_offers
-        SET new_price = $2, quantity1 = $3, quantity2 = $4
+        SET new_price = $2::DECIMAL(10, 2), quantity1 = $3, quantity2 = $4
         WHERE id = $1
         ",
         special_offer.get(),
-        new_price as _,
+        new_price,
         quantity1,
         quantity2,
     )

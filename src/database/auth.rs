@@ -2,12 +2,10 @@
 
 use crate::{
     Id,
-    database::{Administrator, Customer, Username, Vendor},
+    database::{Administrator, Customer, ProfilePicture, Username, Vendor},
 };
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
-
-// TODO: Move this to `database`?
 
 /// Get information about the currently logged in user, if any.
 #[expect(clippy::missing_errors_doc, reason = "TODO")]
@@ -16,14 +14,17 @@ pub async fn logged_in() -> Result<Option<Login>> {
     todo!()
 }
 
+// TODO: Register and login functions.
+
 /// Information about a login session.
-// TODO: Include profile picture.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Login {
-    /// The username of the logged in user.
-    pub username: Username,
     /// The ID of the logged in user.
     pub id: LoginId,
+    /// The username of the logged in user.
+    pub username: Username,
+    /// The profile picture of the logged in user.
+    pub profile_picture: ProfilePicture,
 }
 
 /// A user's role and their ID.

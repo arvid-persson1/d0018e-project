@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE special_offers\n        SET new_price = $2::DECIMAL(10, 2), quantity1 = $3, quantity2 = $4\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Numeric",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1b802341287ff96882216b57b9773f28e1d593cc1c0d3138bd00194c4ff779fc"
+}

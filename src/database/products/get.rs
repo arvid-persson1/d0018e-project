@@ -12,6 +12,7 @@ use {
         products::{build_amount, try_build_special_offer},
     },
     sqlx::query_as,
+    std::cmp::Reverse,
 };
 
 /// An overview of a product, for display on product cards.
@@ -423,7 +424,13 @@ pub async fn newest_products(
     .map_err(Into::into)
 }
 
-/// Get other products in the same category as a given one.
+// PERF: Discount-based sorting of products is currently not supported by an index. If the
+// performance hit is significant, an `active_discount` column should be added to `products` and
+// updated using triggers. However, this does require considering time factors since discounts
+// change "on their own" due to special offers running expiring.
+
+/// Get other products in the same category as a given one sorted by best discounts, as defined by
+/// [`discount_average`](Deal::discount_average).
 ///
 /// Only visible products with units in stock are considered.
 ///
@@ -450,16 +457,12 @@ pub async fn similar_products(
             EXISTS(
                 SELECT 1
                 FROM customer_favorites cf
-                WHERE cf.customer = $1
-                  AND cf.product = p.id
+                WHERE cf.customer = $1 AND cf.product = p.id
             ) AS "favorited!"
         FROM products p
         LEFT JOIN active_special_offers aso ON aso.product = p.id
         JOIN vendors ON vendors.id = p.vendor
-        WHERE visible
-          AND category = $2
-          AND in_stock > 0
-          AND p.id != $3
+        WHERE visible AND category = $2 AND in_stock > 0 AND p.id != $3
         ORDER BY offers_discount(price, aso.new_price, aso.quantity1, aso.quantity2) DESC
         LIMIT $4
         OFFSET $5
@@ -472,7 +475,14 @@ pub async fn similar_products(
     )
     .fetch_all(connection())
     .await
-    .map(|products| products.into_iter().map(Into::into).collect())
+    .map(|products| products.into_iter().map(Into::<ProductOverview>::into).collect::<Box<_>>())
+    .inspect(|products| {
+        debug_assert!(
+            products.is_sorted_by_key(|ProductOverview { special_offer, price, .. }|
+                Reverse(special_offer.map(|(deal, _)| deal.discount_average(*price)))
+            )
+        );
+    })
     .map_err(Into::into)
 }
 
@@ -518,11 +528,19 @@ pub async fn best_discounts(
     )
     .fetch_all(connection())
     .await
-    .map(|products| products.into_iter().map(Into::into).collect())
+    .map(|products| products.into_iter().map(Into::<ProductOverviewDiscounted>::into).collect::<Box<_>>())
+    .inspect(|products| {
+        debug_assert!(
+            products.is_sorted_by_key(|ProductOverviewDiscounted { special_offer_deal, price, .. }|
+                Reverse(special_offer_deal.discount_average(*price))
+            )
+        );
+    })
     .map_err(Into::into)
 }
 
-/// Get products owned by a given vendor.
+/// Get products owned by a given vendor sorted by best discounts as defined by
+/// [`discount_average`](Deal::discount_average), then name.
 ///
 /// Only visible products are considered, but includes products out of stock.
 ///
@@ -548,14 +566,11 @@ pub async fn vendor_products(
             EXISTS(
                 SELECT 1
                 FROM customer_favorites cf
-                WHERE cf.customer = $1
-                  AND cf.product = p.id
+                WHERE cf.customer = $1 AND cf.product = p.id
             ) AS "favorited!"
         FROM products p
         LEFT JOIN active_special_offers aso ON aso.product = p.id
-        WHERE (p.visible OR $5)
-          AND p.vendor = $2
-          AND p.in_stock > 0
+        WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0
         ORDER BY offers_discount(p.price, aso.new_price, aso.quantity1, aso.quantity2) DESC, p.name
         LIMIT $3
         OFFSET $4
@@ -568,10 +583,18 @@ pub async fn vendor_products(
     )
     .fetch_all(connection())
     .await
-    .map(|products| products.into_iter().map(Into::into).collect())
+    .map(|products| products.into_iter().map(Into::<ProductOverviewVendor>::into).collect::<Box<_>>())
+    .inspect(|products| {
+        debug_assert!(
+            products.is_sorted_by_key(|ProductOverviewVendor { special_offer, price, .. }|
+                Reverse(special_offer.map(|(deal, _)| deal.discount_average(*price)))
+            )
+        );
+    })
     .map_err(Into::into)
 }
-/// Get all products a customer has marked as favorites.
+
+/// Get all products a customer has marked as favorites sorted by name.
 ///
 /// Only visible products are considered, but may incldue products out of stock.
 ///

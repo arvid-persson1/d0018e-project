@@ -63,6 +63,9 @@ pub struct ProductInfo {
     /// The customer's rating of the product. Value is unspecified if a customer ID was not
     /// provided.
     pub own_rating: Rating,
+    /// Whether the customer has ever bought the product. Customers are not able to rate products
+    /// they have not bought. Value is unspecified if a customer ID was not provided.
+    pub has_purchased: bool,
 }
 
 #[cfg(feature = "server")]
@@ -95,8 +98,9 @@ struct ProductInfoRepr {
     category_path: Vec<CategoryPathSegment>,
     average_rating: Option<f64>,
     rating_count: Option<i64>,
-    favorited: Option<bool>,
+    favorited: bool,
     own_rating: Option<i32>,
+    has_purchased: bool,
 }
 
 #[cfg(feature = "server")]
@@ -128,6 +132,7 @@ impl ProductInfo {
             rating_count,
             favorited,
             own_rating,
+            has_purchased,
         }: ProductInfoRepr,
     ) -> Self {
         Self {
@@ -162,11 +167,12 @@ impl ProductInfo {
                 members_only,
                 price,
             ),
-            favorited: favorited.unwrap_or_default(),
+            favorited,
             own_rating: Rating::new(own_rating.map_or(1, |r| {
                 r.try_into().expect("Database returned invalid own rating.")
             }))
             .expect("Database returned invalid rating."),
+            has_purchased,
         }
     }
 }
@@ -199,14 +205,18 @@ pub async fn product_info(
             EXISTS(
                 SELECT 1
                 FROM customer_favorites cf
-                WHERE cf.customer = $1
-                  AND cf.product = p.id
-            ) AS favorited,
+                WHERE cf.customer = $1 AND cf.product = p.id
+            ) AS "favorited!",
             (
                 SELECT rating
                 FROM ratings
                 WHERE customer = $1 AND product = $2
-            ) AS own_rating
+            ) AS own_rating,
+            EXISTS(
+                SELECT 1
+                FROM orders
+                WHERE customer = $1 AND product = $2
+            ) AS "has_purchased!"
         FROM products p
         LEFT JOIN active_special_offers aso ON aso.product = p.id
         JOIN vendors ON vendors.id = vendor
@@ -296,7 +306,7 @@ impl From<PurchaseRepr> for Purchase {
     }
 }
 
-/// Get orders made by a customer.
+/// Get orders made by a customer sorted by recency.
 ///
 /// # Errors
 ///
@@ -327,22 +337,21 @@ pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Resu
     )
     .fetch_all(connection())
     .await?
-        .into_iter()
-        .map(|purchase| (purchase.time, Purchase::from(purchase)))
-        // Group by time.
-        .fold(Vec::<Order>::new(), |mut acc, (time, purchase)| {
-            if let Some(last) = acc.last_mut()
-                && time == last.time
-            {
-                last.purchases.push(purchase);
-            } else {
-                acc.push(Order {
-                    time,
-                    purchases: vec![purchase],
-                });
-            }
-            acc
-        });
+    .into_iter()
+    .map(|purchase| (purchase.time, Purchase::from(purchase)))
+    .fold(Vec::<Order>::new(), |mut acc, (time, purchase)| {
+        if let Some(last) = acc.last_mut()
+            && time == last.time
+        {
+            last.purchases.push(purchase);
+        } else {
+            acc.push(Order {
+                time,
+                purchases: vec![purchase],
+            });
+        }
+        acc
+    });
 
     debug_assert!(
         orders.is_sorted_by_key(|order| Reverse(order.time)),

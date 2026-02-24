@@ -22,9 +22,12 @@ pub use id::*;
 mod auth;
 pub use auth::*;
 
+// TODO: It's possible that `Decimal`s will have to be rescaled, clamped, truncated or rounded
+// before insertion into the database. This might warrant a newtype.
+
 // TODO: Is it possible to have borrowed arguments in server functions?
 
-// TODO: Consider having functions that create and possibly also update rows return the IDs.
+// TODO: Consider having functions that create or update rows return the IDs.
 
 pub mod cart;
 pub mod categories;
@@ -58,10 +61,11 @@ pub async fn init_connection(url: String) -> Result<()> {
     ) {
         // Startup code.
         #[expect(clippy::unwrap_used, reason = "Cell was just initialized.")]
-        let _ = query!("SELECT process_expiries();")
-            .execute(CONNECTION.get().unwrap())
+        let res = query!("SELECT process_expiries();")
+            .fetch_all(CONNECTION.get().unwrap())
             .await
             .expect("Failed to run database startup code.");
+        drop(res);
     }
 
     Ok(())

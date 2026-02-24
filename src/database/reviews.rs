@@ -300,7 +300,8 @@ fn build_pfp(
     }
 }
 
-/// Get reviews and associated comments for a product, for display on product pages.
+/// Get reviews and associated comments for a product sorted by score, for display on product
+/// pages.
 ///
 /// # Errors
 ///
@@ -331,11 +332,12 @@ pub async fn product_reviews(
     let reviews = query_as!(
         ReviewRepr,
         r#"
-        SELECT r.id, r.customer, username, profile_picture AS "profile_picture!", rating, r.created_at, r.updated_at, title, content,
-            SUM(CASE review_votes.grade
+        SELECT r.id, r.customer, username, profile_picture AS "profile_picture!", rating,
+            r.created_at, r.updated_at, title, content,
+            COALESCE(SUM(CASE review_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
-            END) AS "sum_votes!"
+            END), 0) AS "sum_votes!"
         FROM reviews r
         JOIN users ON users.id = r.customer
         JOIN customers ON customers.id = r.customer
@@ -359,10 +361,10 @@ pub async fn product_reviews(
         r#"
         SELECT c.id, parent, review, user_id, username, role AS "role: Role", content, c.created_at, c.updated_at,
             customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,
-            SUM(CASE comment_votes.grade
+            COALESCE(SUM(CASE comment_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
-            END) AS "sum_votes!"
+            END), 0) AS "sum_votes!"
         FROM comments c
         JOIN users ON users.id = c.user_id
         LEFT JOIN customers ON customers.id = c.user_id
@@ -370,7 +372,7 @@ pub async fn product_reviews(
         LEFT JOIN comment_votes ON comment_votes.comment = c.id
         WHERE review = ANY($1)
         GROUP BY c.id, username, role, customer_pfp, vendor_pfp
-        ORDER BY parent NULLS FIRST, review, "sum_votes!" DESC, created_at
+        ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         &*reviews
             .iter()
@@ -388,7 +390,7 @@ pub async fn product_reviews(
     // `Into::into` and remove type hints.
     let mut reviews = reviews
         .into_iter()
-        .map(ProductReview::from)
+        .map(Into::<ProductReview>::into)
         .collect::<Box<_>>();
 
     // TODO: Construct comment trees, attach them to reviews.
@@ -412,7 +414,8 @@ pub async fn product_reviews(
     Ok(reviews)
 }
 
-/// Get reviews and associated comments for a product, for display on product pages.
+/// Get reviews and associated comments for a product sorted by score, for display on product
+/// pages.
 ///
 /// # Errors
 ///
@@ -435,6 +438,9 @@ pub async fn product_reviews_as(
     limit: usize,
     offset: usize,
 ) -> Result<(Option<OwnReview>, Box<[ProductReview]>)> {
+    // Own review is fetched separately from usual limit.
+    let mut review_ids = Vec::with_capacity(limit + 1);
+
     let mut tx = connection()
         .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
         .await?;
@@ -443,10 +449,10 @@ pub async fn product_reviews_as(
         OwnReviewRepr,
         r#"
         SELECT r.id, rating, created_at, updated_at, title, content,
-            SUM(CASE review_votes.grade
+            COALESCE(SUM(CASE review_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
-            END) AS "sum_votes!"
+            END), 0) AS "sum_votes!"
         FROM reviews r
         JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer
         LEFT JOIN review_votes ON review_votes.review = r.id
@@ -458,15 +464,19 @@ pub async fn product_reviews_as(
     )
     .fetch_optional(&mut *tx)
     .await?;
+    if let Some(ref own_review) = own_review {
+        review_ids.push(own_review.id);
+    }
 
     let other_reviews = query_as!(
         OtherReviewRepr,
         r#"
-        SELECT r.id, r.customer, username, profile_picture AS "profile_picture!", rating, r.created_at, r.updated_at, title, content,
-            SUM(CASE review_votes.grade
+        SELECT r.id, r.customer, username, profile_picture AS "profile_picture!", rating,
+            r.created_at, r.updated_at, title, content,
+            COALESCE(SUM(CASE review_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
-            END) AS "sum_votes!",
+            END), 0) AS "sum_votes!",
             (
                 SELECT grade
                 FROM review_votes
@@ -496,10 +506,10 @@ pub async fn product_reviews_as(
         r#"
         SELECT c.id, parent, review, user_id, username, role AS "role: Role", content, c.created_at, c.updated_at,
             customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,
-            SUM(CASE comment_votes.grade
+            COALESCE(SUM(CASE comment_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
-            END) AS "sum_votes!",
+            END), 0) AS "sum_votes!",
             (
                 SELECT grade
                 FROM comment_votes
@@ -510,12 +520,15 @@ pub async fn product_reviews_as(
         LEFT JOIN customers ON customers.id = c.user_id
         LEFT JOIN vendors ON vendors.id = c.user_id
         LEFT JOIN comment_votes ON comment_votes.comment = c.id
-        WHERE review IN (SELECT id FROM reviews WHERE product = $2)
+        WHERE review = ANY($2)
         GROUP BY c.id, username, role, customer_pfp, vendor_pfp
-        ORDER BY parent NULLS FIRST, review, "sum_votes!" DESC, created_at
+        ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         customer.get(),
-        product.get(),
+        &*other_reviews
+            .iter()
+            .map(|review| review.id)
+            .collect_into(&mut review_ids),
     )
     .fetch_all(&mut *tx)
     .await?;
@@ -526,11 +539,11 @@ pub async fn product_reviews_as(
 
     // TODO: After missing implementation below, can replace this call with more general
     // `Into::into`.
-    let own_review = own_review.map(OwnReview::from);
+    let own_review = own_review.map(Into::<OwnReview>::into);
 
     let mut other_reviews = other_reviews
         .into_iter()
-        .map(ProductReview::from)
+        .map(Into::<ProductReview>::into)
         .collect::<Box<_>>();
 
     // TODO: Construct comment trees, attach them to reviews.
@@ -730,7 +743,7 @@ pub async fn set_vote_review(
             ",
             customer.get(),
             review.get(),
-            vote as _,
+            vote as Vote,
         )
         .execute(connection())
         .await
@@ -774,7 +787,7 @@ pub async fn set_vote_comment(
             ",
             customer.get(),
             comment.get(),
-            vote as _,
+            vote as Vote,
         )
         .execute(connection())
         .await
@@ -845,7 +858,7 @@ impl From<CustomerReviewRepr> for CustomerReview {
     }
 }
 
-/// Get reviews made by a customer.
+/// Get reviews made by a customer, sorted by most recently updated.
 ///
 /// # Errors
 ///
@@ -868,6 +881,7 @@ pub async fn customer_reviews(
         JOIN products ON products.id = r.product
         JOIN ratings ON ratings.customer = $1 AND ratings.product = r.product
         WHERE r.customer = $1
+        ORDER BY r.updated_at DESC
         LIMIT $2
         OFFSET $3
         ",
