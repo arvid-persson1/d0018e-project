@@ -1,6 +1,7 @@
 -- This is an open copy of the database schema. It is NOT included in any form of build script, CI
--- or validation, so changes here are not automatically reflected in the actual database. Rather,
--- this is meant as a form of documentation of the database schema manually kept up-to-date.
+-- or any other form of validation, so changes here are not automatically reflected in the actual
+-- database. Rather this is meant as a form of documentation of the database schema manually kept
+-- up-to-date.
 
 CREATE EXTENSION citext;
 CREATE EXTENSION btree_gist;
@@ -56,7 +57,7 @@ CREATE TABLE users (
 );
 
 CREATE FUNCTION creation_time() RETURNS TRIGGER
-LANGUAGE plpgsql VOLATILE AS $$
+LANGUAGE plpgsql AS $$
 BEGIN
     NEW.created_at = CASE TG_OP
         WHEN 'INSERT' THEN CURRENT_TIMESTAMP
@@ -72,7 +73,7 @@ BEFORE INSERT OR UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
 CREATE FUNCTION update_time() RETURNS TRIGGER
-LANGUAGE plpgsql VOLATILE AS $$
+LANGUAGE plpgsql AS $$
 BEGIN
     NEW.updated_at := CURRENT_TIMESTAMP;
     RETURN NEW;
@@ -99,7 +100,7 @@ CREATE TABLE vendors (
 );
 
 CREATE FUNCTION update_time_user_super() RETURNS TRIGGER
-LANGUAGE plpgsql VOLATILE AS $$
+LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE users SET updated_at = CURRENT_TIMESTAMP
     WHERE id = NEW.id;
@@ -252,28 +253,32 @@ CREATE TABLE categories (
     parent INT REFERENCES categories(id) ON DELETE CASCADE
 );
 
+CREATE INDEX categories_by_parent_name ON categories (parent NULLS FIRST, name);
+
 CREATE TYPE CATEGORY_PATH_SEGMENT AS (id INT, name TEXT);
 CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[]
-LANGUAGE plpgsql STABLE AS $$
+LANGUAGE plpgsql STABLE STRICT PARALLEL SAFE AS $$
 DECLARE
     path category_path_segment[] := ARRAY[]::category_path_segment[];
-    current categories%ROWTYPE;
+    current_id categories.id%TYPE := start_id;
+    current_name categories.name%TYPE;
+    current_parent categories.parent%TYPE;
 BEGIN
-    current.id := start_id;
-    
     LOOP
-        SELECT * INTO current FROM categories WHERE id = current.id;
-        IF EXISTS (SELECT 1 FROM unnest(path) WHERE id = current.id) THEN
+        SELECT id, name, parent
+        INTO STRICT current_id, current_name, current_parent
+        FROM categories WHERE id = current_id;
+        IF EXISTS (SELECT 1 FROM unnest(path) WHERE id = current_id) THEN
             RAISE EXCEPTION 'Cycle detected.';
         END IF;
 
-        path := ARRAY[(current.id, current.name)] || path;
+        path := path || (current_id, current_name)::CATEGORY_PATH_SEGMENT;
 
-        IF current.parent IS NULL THEN
+        IF current_parent IS NULL THEN
             EXIT;
         END IF;
 
-        current.id := current.parent;
+        current_id := current_parent;
     END LOOP;
 
     RETURN path;
@@ -291,8 +296,6 @@ $$;
 CREATE TRIGGER categories_valid_tree
 AFTER INSERT OR UPDATE OF parent ON categories
 FOR EACH ROW EXECUTE FUNCTION categories_validate_tree();
-
-CREATE INDEX categories_by_parent_name ON categories (parent NULLS FIRST, name);
 
 CREATE TABLE products (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -316,6 +319,11 @@ CREATE TABLE products (
     CONSTRAINT valid_without_unit CHECK (measurement_unit IS NOT NULL OR amount_per_unit % 1 = 0)
 );
 
+CREATE INDEX products_by_vendor ON products (vendor);
+CREATE INDEX products_by_category ON products (category);
+CREATE INDEX visible_products_by_time ON products (created_at DESC)
+WHERE visible AND in_stock > 0;
+
 CREATE TRIGGER products_creation_time
 BEFORE INSERT OR UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION creation_time();
@@ -323,11 +331,6 @@ FOR EACH ROW EXECUTE FUNCTION creation_time();
 CREATE TRIGGER products_update_time
 BEFORE UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION update_time();
-
-CREATE INDEX products_by_vendor ON products (vendor);
-CREATE INDEX products_by_category ON products (category);
-CREATE INDEX visible_products_by_time ON products (created_at DESC)
-WHERE visible AND in_stock > 0;
 
 CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -355,18 +358,21 @@ CREATE TABLE special_offers (
     )
 );
 
+-- Can't make partial to active offers as that depends on the time.
+CREATE INDEX offers_by_product ON special_offers (product);
+
 CREATE VIEW active_special_offers AS
 SELECT *
 FROM special_offers
 WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
 
-CREATE FUNCTION offers_discount(
+CREATE FUNCTION average_discount(
     base_price products.price%TYPE,
     new_price special_offers.new_price%TYPE,
     quantity1 special_offers.quantity1%TYPE,
     quantity2 special_offers.quantity2%TYPE
 ) RETURNS TWOPOINT_UDEC
-LANGUAGE plpgsql IMMUTABLE AS $$
+LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE AS $$
 DECLARE
     discount TWOPOINT_UDEC;
 BEGIN
@@ -417,8 +423,8 @@ LANGUAGE plpgsql STABLE AS $$
 DECLARE
     base_price products.price%TYPE;
 BEGIN
-    SELECT price INTO base_price FROM products WHERE id = NEW.product;
-    PERFORM offers_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2);
+    SELECT price INTO STRICT base_price FROM products WHERE id = NEW.product;
+    PERFORM average_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2);
     RETURN NEW;
 END;
 $$;
@@ -430,7 +436,7 @@ FOR EACH ROW EXECUTE FUNCTION offers_validate_discount();
 CREATE FUNCTION products_validate_discounts() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
 BEGIN
-    PERFORM offers_discount(NEW.price, new_price, quantity1, quantity2)
+    PERFORM average_discount(NEW.price, new_price, quantity1, quantity2)
     FROM special_offers so
     WHERE so.product = NEW.id AND (so.valid_until IS NULL OR so.valid_until > CURRENT_TIMESTAMP);
     RETURN NEW;
@@ -440,9 +446,6 @@ $$;
 CREATE TRIGGER products_valid_discounts
 BEFORE UPDATE OF price ON products
 FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
-
--- Can't make partial to active offers as that depends on the time.
-CREATE INDEX offers_by_product ON special_offers (product);
 
 -- NOTE: It is possible for a customer to have used a special offer more times than the limit
 -- allows due to the limit having changed. Similarly, it is possible for a non-member to have used
@@ -462,8 +465,12 @@ CREATE TABLE expiries (
     expiry DATE NOT NULL,
     number POSITIVE_INT NOT NULL,
     -- Null: not processed yet.
-    processed_at NONFUTURE_TIMESTAMP CONSTRAINT processed_after_expiry CHECK (processed_at >= expiry)
+    processed_at NONFUTURE_TIMESTAMP CONSTRAINT processed_after_expiry CHECK (processed_at >= expiry),
+    CONSTRAINT aggregate_expiries UNIQUE (product, expiry)
 );
+
+CREATE INDEX expiries_by_product_processed ON expiries (product, processed_at NULLS FIRST);
+CREATE INDEX expiries_by_product_date ON expiries (product, expiry);
 
 CREATE VIEW pending_expiries AS
 SELECT *
@@ -503,8 +510,6 @@ CREATE FUNCTION process_expiries() RETURNS TABLE (
     RETURNING products.id, counts.total
 $$;
 
-CREATE INDEX expiries_by_product ON expiries (product);
-
 -- WARN: Only actually runs at midnight. If the database is down at that time, expiries will be
 -- missed. Hence, call this function on establishing a connection to the database. If this is done,
 -- there will be no issues with data integrity as the downage would also prevent orders from being
@@ -519,6 +524,69 @@ SELECT cron.schedule (
     SELECT process_expiries();
     $$
 );
+
+CREATE FUNCTION add_stock(
+    product_id INT,
+    number INT,
+    expiry DATE = NULL
+) RETURNS INT
+LANGUAGE plpgsql AS $$
+DECLARE
+    new_stock INT;
+BEGIN
+    IF expiry IS NOT NULL THEN
+        INSERT INTO expiries (product, expiry, number)
+        VALUES (product_id, expiry, number)
+        ON CONFLICT (product, expiry) DO UPDATE
+        SET number = expiries.number + EXCLUDED.number;
+    END IF;
+    
+    UPDATE products
+    SET in_stock = in_stock + number
+    WHERE id = product_id
+    RETURNING in_stock INTO STRICT new_stock;
+
+    RETURN new_stock;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION sale_remove_expiries(
+    product_id expiries.product%TYPE,
+    number INT
+) RETURNS INT
+LANGUAGE plpgsql VOLATILE AS $$
+DECLARE
+    remaining INT := number;
+    current_date expiries.expiry%TYPE;
+    current_number expiries.number%TYPE;
+BEGIN
+    IF remaining < 0 THEN
+        RAISE EXCEPTION 'Can''t sell negative number.';
+    END IF;
+
+    FOR current_date, current_number IN
+        SELECT expiry, number
+        FROM expiries
+        WHERE product = product_id AND processed_at IS NULL
+        ORDER BY expiry
+        FOR UPDATE
+    LOOP
+        IF current_number > remaining THEN
+            UPDATE expiries
+            SET number = number - remaining
+            WHERE product = product_id AND expiry = current_date;
+
+            RETURN 0;
+        ELSE
+            remaining := remaining - current_number;
+            DELETE FROM expiries
+            WHERE product = product_id AND expiry = current_date;
+        END IF;
+    END LOOP;
+
+    RETURN remaining;
+END;
+$$;
 
 -- Only customers are allowed to rate and review products. Vendors woulf use these only to inflate
 -- scores on their own products, and administrators have no reason to. However, all users can reply
@@ -559,6 +627,9 @@ CREATE TABLE reviews (
     FOREIGN KEY (product, customer) REFERENCES ratings ON DELETE RESTRICT
 );
 
+CREATE INDEX reviews_by_customer_update ON reviews (customer, updated_at DESC);
+CREATE INDEX reviews_by_product ON reviews (product);
+
 CREATE TRIGGER reviews_creation_time
 BEFORE INSERT OR UPDATE ON reviews
 FOR EACH ROW EXECUTE FUNCTION creation_time();
@@ -581,9 +652,6 @@ $$;
 CREATE TRIGGER validate_reviewer
 BEFORE INSERT OR UPDATE OF customer ON reviews
 FOR EACH ROW EXECUTE FUNCTION reviewer_can_review();
-
-CREATE INDEX reviews_by_customer_update ON reviews (customer, updated_at DESC);
-CREATE INDEX reviews_by_product ON reviews (product);
 
 CREATE TABLE review_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -620,6 +688,8 @@ CREATE TABLE comments (
     -- Null: belongs to review directly.
     parent INT DEFAULT NULL REFERENCES comments(id) ON DELETE CASCADE
 );
+
+CREATE INDEX comments_by_review_parent ON comments (review, parent NULLS FIRST);
 
 CREATE TRIGGER comments_creation_time
 BEFORE INSERT OR UPDATE ON comments
@@ -658,9 +728,12 @@ BEGIN
         IF current_id = ANY(visited) THEN
             RAISE EXCEPTION 'Cycle detected.';
         END IF;
-
         visited := visited || current_id;
-        SELECT parent INTO current_parent FROM comments WHERE id = current_id;
+
+        SELECT parent 
+        INTO STRICT current_parent
+        FROM comments
+        WHERE id = current_id;
         current_id := current_parent;
     END LOOP;
     
@@ -671,8 +744,6 @@ $$;
 CREATE TRIGGER comments_valid_tree
 BEFORE INSERT OR UPDATE OF parent ON comments
 FOR EACH ROW EXECUTE FUNCTION comments_validate_tree();
-
-CREATE INDEX comments_by_review_parent ON comments (review, parent NULLS FIRST);
 
 CREATE TABLE comment_votes (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -702,13 +773,74 @@ CREATE TABLE shopping_cart_items (
     -- happened, but not what the product was.
     product INT REFERENCES products(id) ON DELETE SET NULL,
     number POSITIVE_INT NOT NULL,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (customer, product)
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Unique `(customer, product)` pairs except that `NULL = NULL` for `product`.
+CREATE UNIQUE INDEX items_valid ON shopping_cart_items (customer, product)
+WHERE product IS NOT NULL;
+CREATE UNIQUE INDEX items_removed ON shopping_cart_items (customer)
+WHERE product IS NULL;
 
 CREATE TRIGGER cart_update_time
 BEFORE UPDATE ON shopping_cart_items
 FOR EACH ROW EXECUTE FUNCTION update_time();
+
+CREATE PROCEDURE set_visibility(product_id INT, visible BOOLEAN)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT visible THEN
+        UPDATE shopping_cart_items
+        SET product = NULL
+        WHERE product = product_id;
+    END IF;
+
+    UPDATE products
+    SET visible = visible
+    WHERE id = product_id;
+END;
+$$;
+
+CREATE FUNCTION calculate_price(
+    base_price products.price%TYPE,
+    number shopping_cart_items.number%TYPE,
+    new_price special_offers.new_price%TYPE,
+    quantity1 special_offers.quantity1%TYPE,
+    quantity2 special_offers.quantity2%TYPE,
+    remaining_uses UINT,
+    OUT price DECIMAL(10, 2),
+    OUT uses INT
+) LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE AS $$
+BEGIN
+    IF base_price IS NULL THEN
+        RAISE EXCEPTION 'Base price must not be null.';
+    ELSIF number IS NULL THEN
+        RAISE EXCEPTION 'Number of units must not be null.';
+    ELSIF remaining_uses IS NULL THEN
+        RAISE EXCEPTION 'Remaining uses must not be null.';
+    END IF;
+
+    -- No special offer.
+    IF new_price IS NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
+        uses := 0;
+        price := base_price * number;
+    -- Variant 1.
+    ELSIF new_price IS NOT NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
+        uses := LEAST(number, remaining_uses);
+        price := uses * (new_price - base_price) + base_price * number;
+    -- Variant 2.
+    ELSIF new_price IS NULL AND quantity1 IS NOT NULL AND quantity2 IS NOT NULL THEN
+        uses := LEAST(number / quantity1, remaining_uses);
+        price := base_price * (number - uses * (quantity1 - quantity2));
+    -- Variant 3.
+    ELSIF new_price IS NOT NULL AND quantity1 IS NOT NULL AND quantity2 IS NULL THEN
+        uses := LEAST(number / quantity1, remaining_uses);
+        price := new_price * uses + base_price * (number - quantity1 * uses);
+    ELSE
+        RAISE EXCEPTION 'Invalid variant.';
+    END IF;
+END;
+$$;
 
 CREATE TABLE customer_favorites (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -720,6 +852,51 @@ CREATE TABLE customer_favorites (
 CREATE TRIGGER favorites_creation_time
 BEFORE INSERT OR UPDATE ON customer_favorites
 FOR EACH ROW EXECUTE FUNCTION creation_time();
+
+CREATE PROCEDURE delete_user(id INT)
+LANGUAGE plpgsql AS $$
+BEGIN
+    -- NOTE: Soft deletion. Possible corresponding row in role-specific table is also kept.
+    UPDATE users
+    SET deleted = true
+    WHERE id = id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'User does not exist.';
+    END IF;
+
+    -- PERF: Several of these queries are not supported by indices: we imagine account deletions
+    -- are rare.
+    IF EXISTS (SELECT 1 FROM customers WHERE id = id) THEN
+        DELETE FROM special_offer_uses
+        WHERE customer = id;
+
+        -- NOTE: Reviews must be deleted before ratings.
+        DELETE FROM reviews
+        WHERE customer = id;
+
+        DELETE FROM ratings
+        WHERE customer = id;
+
+        DELETE FROM review_votes
+        WHERE customer = id;
+
+        DELETE FROM comment_votes
+        WHERE customer = id;
+
+        DELETE FROM shopping_cart_items
+        WHERE customer = id;
+
+        DELETE FROM customer_favorites
+        WHERE customer = id;
+    ELSIF EXISTS (SELECT 1 FROM vendors WHERE id = id) THEN
+        DELETE FROM products
+        WHERE vendor = id;
+    END IF;
+
+    DELETE FROM comments
+    WHERE user_id = id;
+END;
+$$;
 
 CREATE TABLE orders (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -749,3 +926,88 @@ CREATE TABLE orders (
 
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
+
+CREATE PROCEDURE checkout(customer_id INT)
+LANGUAGE plpgsql AS $$
+DECLARE
+    item_count INT;
+BEGIN
+    -- Can this be made into one statement or an "implicit" table creation?
+    CREATE TEMP TABLE items (
+        product INT,
+        number POSITIVE_INT NOT NULL
+    ) ON COMMIT DROP;
+    WITH deleted AS (
+        DELETE FROM shopping_cart_items
+        WHERE customer = customer_id
+        RETURNING product, number
+    )
+    INSERT INTO items
+    SELECT product, number
+    FROM deleted;
+
+    -- Can this be inlined and the variable removed?
+    GET DIAGNOSTICS item_count = ROW_COUNT;
+    IF item_count = 0 THEN
+        -- RAISE NOTICE 'Checkout with no items.';
+        RETURN;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM items
+        LEFT JOIN products ON id = product
+        WHERE id IS NULL OR NOT visible
+    ) THEN
+        RAISE EXCEPTION 'Checkout with missing or invisible product.';
+    END IF;
+
+    UPDATE products
+    -- Fails if negative.
+    SET in_stock = in_stock - number
+    FROM items
+    WHERE id = product;
+
+    PERFORM sale_remove_expiries(product, number)
+    FROM items;
+
+    CREATE TEMP TABLE results (
+        product INT NOT NULL,
+        number POSITIVE_INT NOT NULL,
+        amount_per_unit TWOPOINT_UDEC NOT NULL,
+        measurement_unit TEXT,
+        price TWOPOINT_UDEC,
+        uses INT NOT NULL,
+        special_offer_id INT
+    ) ON COMMIT DROP;
+    INSERT INTO results
+    SELECT i.product, i.number, amount_per_unit, measurement_unit, price, uses, aso.id
+    FROM items i
+    JOIN products ON products.id = product
+    JOIN customers ON customers.id = customer_id
+    LEFT JOIN active_special_offers aso ON aso.product = i.product
+    LEFT JOIN special_offer_uses u ON u.special_offer = aso.id AND u.customer = customer_id
+    CROSS JOIN LATERAL calculate_price(
+        price,
+        i.number,
+        new_price,
+        quantity1,
+        quantity2,
+        CASE
+            WHEN members_only AND member_since IS NULL THEN 0
+            ELSE GREATEST(limit_per_customer - COALESCE(u.number, 0), 0)
+        END
+    ) AS calc;
+
+    INSERT INTO special_offer_uses (special_offer, customer, number)
+    SELECT special_offer_id, customer_id, uses
+    FROM results
+    WHERE special_offer_id IS NOT NULL AND uses > 0
+    ON CONFLICT (special_offer, customer) DO UPDATE
+    SET uses = uses + EXCLUDED.uses;
+
+    INSERT INTO orders (customer, product, number, paid, special_offer_used, amount_per_unit, measurement_unit)
+    SELECT customer_id, product, number, price, uses > 0, amount_per_unit, measurement_unit
+    FROM results;
+END;
+$$;
