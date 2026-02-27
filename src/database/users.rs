@@ -4,7 +4,7 @@ use crate::database::{Customer, Email, Id, Url, User, Username, Vendor};
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt as _, connection},
+    crate::database::{QueryResultExt, connection},
     sqlx::query,
 };
 
@@ -21,126 +21,11 @@ use {
 /// - An error occurs during communication with the database.
 #[server]
 pub async fn delete_user(user: Id<User>) -> Result<()> {
-    let user = user.get();
-    let mut tx = connection().begin().await?;
-
-    // PERF: Several of these queries are not supported by indices: we imagine account deletions
-    // are rare.
-
-    // NOTE: Soft deletion. Possible corresponding row in role-specific table is also kept.
-    query!(
-        "
-        UPDATE users
-        SET deleted = true
-        WHERE id = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .by_unique_key(|| todo!())?;
-
-    query!(
-        "
-        DELETE FROM products
-        WHERE vendor = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM special_offer_uses
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    // NOTE: Must be done before deleting rating.
-    query!(
-        "
-        DELETE FROM reviews
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM ratings
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM review_votes
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM comments
-        WHERE user_id = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM comment_votes
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM shopping_cart_items
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    query!(
-        "
-        DELETE FROM customer_favorites
-        WHERE customer = $1
-        ",
-        user
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    tx.commit().await.map_err(|_err| todo!())
+    query!("SELECT delete_user($1)", user.get())
+        .execute(connection())
+        .await
+        .map(QueryResultExt::procedure)
+        .map_err(Into::into)
 }
 
 /// Set a customer's profile picture.

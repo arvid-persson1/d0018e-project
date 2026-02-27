@@ -9,9 +9,12 @@ use serde::{Deserialize, Serialize};
 
 /// Get information about the currently logged in user, if any.
 #[expect(clippy::missing_errors_doc, reason = "TODO")]
+#[expect(clippy::unused_async, reason = "TODO")]
 #[server]
 pub async fn logged_in() -> Result<Option<Login>> {
-    todo!()
+    // TODO: Implement.
+    eprintln!("Login unimplemented.");
+    Ok(None)
 }
 
 // TODO: Register and login functions.

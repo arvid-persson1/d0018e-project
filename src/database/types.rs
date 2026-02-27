@@ -110,6 +110,17 @@ impl Display for Amount {
 pub struct Rating(NonZeroU8);
 
 impl Rating {
+    /// A one-star rating.
+    pub const ONE_STAR: Self = Self(NonZero::new(1).unwrap());
+    /// A two-star rating.
+    pub const TWO_STARS: Self = Self(NonZero::new(2).unwrap());
+    /// A three-star rating.
+    pub const THREE_STARS: Self = Self(NonZero::new(3).unwrap());
+    /// A four-star rating.
+    pub const FOUR_STARS: Self = Self(NonZero::new(4).unwrap());
+    /// A five-star rating.
+    pub const FIVE_STARS: Self = Self(NonZero::new(5).unwrap());
+
     /// Verify the rating is in range and constructs a `Rating` on success.
     #[must_use]
     #[expect(clippy::missing_panics_doc, reason = "See note.")]
@@ -170,7 +181,6 @@ impl Eq for AverageRating {}
 
 impl AverageRating {
     /// Verify the rating is in range and constructs an `AverageRating` on success.
-    // TODO: Add infallible variant based on `Rating`.
     #[must_use]
     pub fn new(rating: f64, count: u64) -> Option<Self> {
         if count == 0 {
@@ -199,6 +209,16 @@ impl AverageRating {
     #[must_use]
     pub const fn count(self) -> u64 {
         self.count
+    }
+}
+
+impl From<Rating> for AverageRating {
+    fn from(value: Rating) -> Self {
+        let Rating(r) = value;
+        Self {
+            rating: f64::from(r.get()),
+            count: 1,
+        }
     }
 }
 

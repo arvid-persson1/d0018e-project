@@ -399,15 +399,15 @@ pub async fn newest_products(
         ProductRepr,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,
-            vendors.display_name AS vendor_name,
-            EXISTS(
+            new_price, quantity1, quantity2, members_only,
+            display_name AS vendor_name,
+            EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
                 WHERE cf.customer = $1 AND cf.product = p.id
             ) AS "favorited!"
         FROM products p
-        LEFT JOIN active_special_offers aso ON aso.product = p.id
+        LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
         WHERE visible AND in_stock > 0
         ORDER BY created_at DESC
@@ -452,18 +452,18 @@ pub async fn similar_products(
         ProductRepr,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,
-            vendors.display_name AS vendor_name,
-            EXISTS(
+            new_price, quantity1, quantity2, members_only,
+            display_name AS vendor_name,
+            EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
                 WHERE cf.customer = $1 AND cf.product = p.id
             ) AS "favorited!"
         FROM products p
-        LEFT JOIN active_special_offers aso ON aso.product = p.id
+        LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
         WHERE visible AND category = $2 AND in_stock > 0 AND p.id != $3
-        ORDER BY offers_discount(price, aso.new_price, aso.quantity1, aso.quantity2) DESC
+        ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC
         LIMIT $4
         OFFSET $5
         "#,
@@ -507,18 +507,18 @@ pub async fn best_discounts(
         ProductReprDiscounted,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only AS "members_only!",
-            vendors.display_name AS vendor_name,
-            EXISTS(
+            new_price, quantity1, quantity2, members_only AS "members_only!",
+            display_name AS vendor_name,
+            EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
                 WHERE cf.customer = $1 AND cf.product = p.id
             ) AS "favorited!"
         FROM products p
-        JOIN active_special_offers aso ON aso.product = p.id
+        JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
         WHERE visible AND in_stock > 0
-        ORDER BY offers_discount(price, aso.new_price, aso.quantity1, aso.quantity2) DESC
+        ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC
         LIMIT $2
         OFFSET $3
         "#,
@@ -562,16 +562,16 @@ pub async fn vendor_products(
         ProductReprVendor,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,
-            EXISTS(
+            new_price, quantity1, quantity2, members_only,
+            EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
                 WHERE cf.customer = $1 AND cf.product = p.id
             ) AS "favorited!"
         FROM products p
-        LEFT JOIN active_special_offers aso ON aso.product = p.id
+        LEFT JOIN active_special_offers ON product = p.id
         WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0
-        ORDER BY offers_discount(p.price, aso.new_price, aso.quantity1, aso.quantity2) DESC, p.name
+        ORDER BY average_discount(p.price, new_price, quantity1, quantity2) DESC, p.name
         LIMIT $3
         OFFSET $4
         "#,
@@ -614,10 +614,10 @@ pub async fn favorites(
         ProductReprFavorited,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,
-            vendors.display_name AS vendor_name
+            new_price, quantity1, quantity2, members_only,
+            display_name AS vendor_name
         FROM products p
-        LEFT JOIN active_special_offers aso ON aso.product = p.id
+        LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
         JOIN customer_favorites cf ON cf.product = p.id
         WHERE visible AND cf.customer = $1

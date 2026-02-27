@@ -284,8 +284,8 @@ struct CommentReprCustomer {
 ///
 /// Panics if the values do not uphold any of the database's invariants.
 #[cfg(feature = "server")]
-#[expect(clippy::unreachable, reason = "Database validation only.")]
 #[expect(dead_code, reason = "TODO")]
+#[expect(clippy::unreachable, reason = "Database validation only.")]
 fn build_pfp(
     role: Role,
     customer_pfp: Option<String>,
@@ -311,7 +311,6 @@ fn build_pfp(
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
 #[server]
-#[expect(unreachable_code, reason = "TODO")]
 #[expect(unused_mut, reason = "TODO")]
 #[expect(unused_variables, reason = "TODO")]
 #[expect(
@@ -342,7 +341,7 @@ pub async fn product_reviews(
         JOIN users ON users.id = r.customer
         JOIN customers ON customers.id = r.customer
         JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer
-        LEFT JOIN review_votes ON review_votes.review = r.id
+        LEFT JOIN review_votes ON review = r.id
         WHERE r.product = $1
         GROUP BY r.id, username, profile_picture, rating
         ORDER BY "sum_votes!" DESC
@@ -369,7 +368,7 @@ pub async fn product_reviews(
         JOIN users ON users.id = c.user_id
         LEFT JOIN customers ON customers.id = c.user_id
         LEFT JOIN vendors ON vendors.id = c.user_id
-        LEFT JOIN comment_votes ON comment_votes.comment = c.id
+        LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($1)
         GROUP BY c.id, username, role, customer_pfp, vendor_pfp
         ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
@@ -394,7 +393,7 @@ pub async fn product_reviews(
         .collect::<Box<_>>();
 
     // TODO: Construct comment trees, attach them to reviews.
-    todo!();
+    eprintln!("Comment trees unimplemented.");
 
     debug_assert!(
         {
@@ -425,7 +424,6 @@ pub async fn product_reviews(
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
 #[server]
-#[expect(unreachable_code, reason = "TODO")]
 #[expect(unused_mut, reason = "TODO")]
 #[expect(unused_variables, reason = "TODO")]
 #[expect(
@@ -455,7 +453,7 @@ pub async fn product_reviews_as(
             END), 0) AS "sum_votes!"
         FROM reviews r
         JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer
-        LEFT JOIN review_votes ON review_votes.review = r.id
+        LEFT JOIN review_votes ON review = r.id
         WHERE r.customer = $1 AND r.product = $2
         GROUP BY r.id, rating
         "#,
@@ -486,7 +484,7 @@ pub async fn product_reviews_as(
         JOIN users ON users.id = r.customer
         JOIN customers ON customers.id = r.customer
         JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer
-        LEFT JOIN review_votes ON review_votes.review = r.id
+        LEFT JOIN review_votes ON review = r.id
         WHERE r.product = $2 AND r.customer != $1
         GROUP BY r.id, username, profile_picture, rating
         ORDER BY "sum_votes!" DESC
@@ -519,7 +517,7 @@ pub async fn product_reviews_as(
         JOIN users ON users.id = c.user_id
         LEFT JOIN customers ON customers.id = c.user_id
         LEFT JOIN vendors ON vendors.id = c.user_id
-        LEFT JOIN comment_votes ON comment_votes.comment = c.id
+        LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($2)
         GROUP BY c.id, username, role, customer_pfp, vendor_pfp
         ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
@@ -547,7 +545,7 @@ pub async fn product_reviews_as(
         .collect::<Box<_>>();
 
     // TODO: Construct comment trees, attach them to reviews.
-    todo!();
+    eprintln!("Comment trees unimplemented.");
 
     debug_assert!(
         {
@@ -876,7 +874,7 @@ pub async fn customer_reviews(
     query_as!(
         CustomerReviewRepr,
         "
-        SELECT r.product, thumbnail, rating, title, content, products.name AS product_name
+        SELECT r.product, thumbnail, rating, title, content, name AS product_name
         FROM reviews r
         JOIN products ON products.id = r.product
         JOIN ratings ON ratings.customer = $1 AND ratings.product = r.product

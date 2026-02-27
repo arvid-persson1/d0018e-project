@@ -34,13 +34,7 @@ regex = { default-features = false, features = [
 ], version = "1.12.2" }
 rust_decimal = { default-features = false, features = ["serde", "std"], version = "1.40.0" }
 serde = { default-features = false, features = ["alloc", "derive", "std"], version = "1.0.228" }
-sqlx = { default-features = false, features = [
-    "macros",
-    "postgres",
-    "runtime-tokio",
-    "rust_decimal",
-    "time",
-], optional = true, version = "0.8.6" }
+sqlx = { default-features = false, features = ["macros", "postgres", "runtime-tokio", "rust_decimal", "time"], optional = true, version = "0.8.6" }
 thiserror = "2.0.18"
 time = { features = ["serde"], version = "0.3.47" }
 tokio = { default-features = false, features = [

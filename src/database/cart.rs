@@ -8,6 +8,9 @@ use {
     sqlx::query,
 };
 
+// TODO: Function to get items in cart, include prices with discounts, separate member/nonmember
+// prices?
+
 /// Put `number` units of a product in a customer's shopping cart, *overriding any number
 /// already there*. Setting `number = 0` removes the product from the shopping cart.
 ///
@@ -85,16 +88,14 @@ pub async fn remove_deleted_from_cart(customer: Id<Customer>) -> Result<()> {
 ///
 /// Fails if:
 /// - `customer` is invalid.
+/// - The customer has any deleted or invisible products in their cart.
+/// - The customer has more units in their cart than there are in stock.
 /// - An error occurs during communication with the database.
 #[server]
-#[expect(unused_variables, reason = "TODO")]
-#[expect(unused_mut, reason = "TODO")]
-#[expect(unreachable_code, reason = "TODO")]
-#[expect(clippy::map_err_ignore, reason = "TODO")]
 pub async fn checkout(customer: Id<Customer>) -> Result<()> {
-    let mut tx = connection().begin().await?;
-
-    todo!();
-
-    tx.commit().await.map_err(|_| todo!())
+    query!("CALL checkout($1)", customer.get())
+        .execute(connection())
+        .await
+        .map(QueryResultExt::procedure)
+        .map_err(Into::into)
 }

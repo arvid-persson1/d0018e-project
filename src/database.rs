@@ -22,7 +22,7 @@ pub use id::*;
 mod auth;
 pub use auth::*;
 
-// TODO: It's possible that `Decimal`s will have to be rescaled, clamped, truncated or rounded
+// FIXME: It's possible that `Decimal`s will have to be rescaled, clamped, truncated or rounded
 // before insertion into the database. This might warrant a newtype.
 
 // TODO: Is it possible to have borrowed arguments in server functions?
@@ -108,6 +108,15 @@ trait QueryResultExt: Sized {
     /// Panics if more than one row were affected.
     fn expect_maybe(self);
 
+    /// Assert that the query was a call to a stored procedure.
+    ///
+    /// This function *has false positives* since a normal query could also affect 0 rows.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any rows were affected, as procedures always return 0.
+    fn procedure(self);
+
     /// Assert that exactly one row was affected as the query specified a unique key, returning
     /// an error if the key didn't exist and panicking if it wasn't unique.
     ///
@@ -119,6 +128,7 @@ trait QueryResultExt: Sized {
     /// # Panics
     ///
     /// Panics if the query affected multiple rows, i.e. the key wasn't unique.
+    // TODO: Have this return `CapturedError` and perform conversion in the method.
     fn by_unique_key<E>(self, on_zero: impl FnOnce() -> E) -> Result<(), E>;
 }
 
@@ -137,6 +147,10 @@ impl QueryResultExt for QueryResult {
             0 | 1 => {},
             _ => panic!("Query unexpectedly affected several rows."),
         }
+    }
+
+    fn procedure(self) {
+        assert!(self.rows_affected() != 0, "Query was not a procedure call.");
     }
 
     #[expect(clippy::unreachable, reason = "Key enforces uniqueness.")]

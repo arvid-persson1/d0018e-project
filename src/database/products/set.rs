@@ -8,7 +8,8 @@ use time::Date;
 #[cfg(feature = "server")]
 use {
     crate::database::{QueryResultExt, connection},
-    sqlx::{query, query_as},
+    sqlx::{query, query_as, query_scalar},
+    std::num::NonZero,
 };
 
 /// Create a new product.
@@ -337,45 +338,32 @@ pub async fn set_origin(product: Id<Product>, origin: Box<str>) -> Result<()> {
 /// - The number overflows.
 /// - An error occurs during communication with the database.
 #[server]
+#[expect(clippy::missing_panics_doc, reason = "Database validation only.")]
 pub async fn add_stock(
     product: Id<Product>,
-    expiry: Option<Date>,
     number: NonZeroU32,
-) -> Result<()> {
+    expiry: Option<Date>,
+) -> Result<NonZeroU32> {
     // NOTE: `expiry` intentionally not checked for being in the past as even then the database
     // might see it at a later time where it then is in the past.
 
-    let number = i32::try_from(number.get())?;
-
-    let mut tx = connection().begin().await?;
-
-    query!(
+    query_scalar!(
         "
-        UPDATE products
-        SET in_stock = in_stock + $2
-        WHERE id = $1
+        SELECT add_stock($1, $2, $3)
         ",
         product.get(),
-        number
-    )
-    .execute(&mut *tx)
-    .await?
-    .by_unique_key(|| todo!())?;
-
-    query!(
-        "
-        INSERT INTO expiries (product, expiry, number)
-        VALUES ($1, $2, $3::INT)
-        ",
-        product.get(),
+        i32::try_from(number.get())?,
         expiry,
-        number,
     )
-    .execute(&mut *tx)
-    .await?
-    .expect_one();
-
-    tx.commit().await.map_err(|_err| todo!())
+    .fetch_one(connection())
+    .await
+    .map(|new_stock| {
+        u32::try_from(new_stock.expect("Database didn't return new stock."))
+            .ok()
+            .and_then(NonZero::new)
+            .expect("Database returned non-positive new stock.")
+    })
+    .map_err(Into::into)
 }
 
 /// Set the visibility of a product.
@@ -390,35 +378,12 @@ pub async fn add_stock(
 /// - An error occurs during communication with the database.
 #[server]
 pub async fn set_visibility(product: Id<Product>, visible: bool) -> Result<()> {
-    let mut tx = connection().begin().await?;
-
-    query!(
-        "
-        UPDATE products
-        SET visible = $2
-        WHERE id = $1
-        ",
-        product.get(),
-        visible,
-    )
-    .execute(&mut *tx)
-    .await?
-    .by_unique_key(|| todo!())?;
-
-    // PERF: Not currently supported by an index.
-    query!(
-        "
-        UPDATE shopping_cart_items
-        SET product = NULL
-        WHERE product = $1
-        ",
-        product.get(),
-    )
-    .execute(&mut *tx)
-    .await?
-    .allow_any();
-
-    tx.commit().await.map_err(|_err| todo!())
+    // PERF: First subquery not currently supported by an index.
+    query!("CALL set_visibility($1, $2)", product.get(), visible)
+        .execute(connection())
+        .await
+        .map(QueryResultExt::procedure)
+        .map_err(Into::into)
 }
 
 /// Set the "favorite" status of a product for a customer.

@@ -213,12 +213,12 @@ pub async fn product_info(
         SELECT name, thumbnail, price, p.description, in_stock, origin,
             gallery AS "gallery: Vec<String>",
             amount_per_unit, measurement_unit, visible, created_at, updated_at,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only, aso.limit_per_customer,
+            new_price, quantity1, quantity2, members_only, limit_per_customer,
             vendors.id AS vendor_id, vendors.display_name AS vendor_name,
             category_path(category) AS "category_path!: Vec<CategoryPathSegment>",
             AVG(ratings.rating::FLOAT) AS average_rating,
             COUNT(ratings.rating) AS "rating_count!",
-            EXISTS(
+            EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
                 WHERE cf.customer = $1 AND cf.product = p.id
@@ -228,18 +228,17 @@ pub async fn product_info(
                 FROM ratings
                 WHERE customer = $1 AND product = $2
             ) AS own_rating,
-            EXISTS(
+            EXISTS (
                 SELECT 1
                 FROM orders
                 WHERE customer = $1 AND product = $2
             ) AS "has_purchased!"
         FROM products p
-        LEFT JOIN active_special_offers aso ON aso.product = p.id
+        LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = vendor
         LEFT JOIN ratings ON ratings.product = p.id
         WHERE p.id = $1
-        GROUP BY p.id, vendors.id,
-            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only, aso.limit_per_customer
+        GROUP BY p.id, vendors.id, new_price, quantity1, quantity2, members_only, limit_per_customer
         "#,
         customer.map(Id::get),
         product.get()
@@ -340,7 +339,7 @@ pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Resu
         "
         SELECT time, paid, special_offer_used, number, o.amount_per_unit, o.measurement_unit,
             p.name AS product_name, p.thumbnail,
-            vendors.display_name AS vendor_name
+            display_name AS vendor_name
         FROM orders o
         JOIN products p ON p.id = o.product
         JOIN vendors ON vendors.id = p.vendor
