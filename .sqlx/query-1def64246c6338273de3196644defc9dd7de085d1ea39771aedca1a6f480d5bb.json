@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT r.product, thumbnail, rating, title, content, products.name AS product_name\n        FROM reviews r\n        JOIN products ON products.id = r.product\n        JOIN ratings ON ratings.customer = $1 AND ratings.product = r.product\n        WHERE r.customer = $1\n        ORDER BY r.updated_at DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "query": "\n        SELECT r.product, thumbnail, rating, title, content, name AS product_name\n        FROM reviews r\n        JOIN products ON products.id = r.product\n        JOIN ratings ON ratings.customer = $1 AND ratings.product = r.product\n        WHERE r.customer = $1\n        ORDER BY r.updated_at DESC\n        LIMIT $2\n        OFFSET $3\n        ",
   "describe": {
     "columns": [
       {
@@ -50,5 +50,5 @@
       false
     ]
   },
-  "hash": "f744b680767b961716c307aedb3d6555578198041ceec512530b24ff0eca5e9f"
+  "hash": "1def64246c6338273de3196644defc9dd7de085d1ea39771aedca1a6f480d5bb"
 }

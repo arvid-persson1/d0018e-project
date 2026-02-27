@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only,\n            vendors.display_name AS vendor_name,\n            EXISTS(\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        LEFT JOIN active_special_offers aso ON aso.product = p.id\n        JOIN vendors ON vendors.id = p.vendor\n        WHERE visible AND in_stock > 0\n        ORDER BY created_at DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            new_price, quantity1, quantity2, members_only,\n            EXISTS (\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        LEFT JOIN active_special_offers ON product = p.id\n        WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0\n        ORDER BY average_discount(p.price, new_price, quantity1, quantity2) DESC, p.name\n        LIMIT $3\n        OFFSET $4\n        ",
   "describe": {
     "columns": [
       {
@@ -70,11 +70,6 @@
       },
       {
         "ordinal": 13,
-        "name": "vendor_name",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 14,
         "name": "favorited!",
         "type_info": "Bool"
       }
@@ -82,8 +77,10 @@
     "parameters": {
       "Left": [
         "Int4",
+        "Int4",
         "Int8",
-        "Int8"
+        "Int8",
+        "Bool"
       ]
     },
     "nullable": [
@@ -100,9 +97,8 @@
       true,
       true,
       true,
-      false,
       null
     ]
   },
-  "hash": "789aebf1fe2850d8b61423f5387f4515504141cb68f8074e98959e41f5c853db"
+  "hash": "8544e747fde031df4cd10cac77aa4d50002187f8f37d07d07eee17355fbb6395"
 }

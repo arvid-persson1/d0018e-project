@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            aso.new_price, aso.quantity1, aso.quantity2, aso.members_only AS \"members_only!\",\n            vendors.display_name AS vendor_name,\n            EXISTS(\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        JOIN active_special_offers aso ON aso.product = p.id\n        JOIN vendors ON vendors.id = p.vendor\n        WHERE visible AND in_stock > 0\n        ORDER BY offers_discount(price, aso.new_price, aso.quantity1, aso.quantity2) DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            new_price, quantity1, quantity2, members_only,\n            display_name AS vendor_name,\n            EXISTS (\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        LEFT JOIN active_special_offers ON product = p.id\n        JOIN vendors ON vendors.id = p.vendor\n        WHERE visible AND category = $2 AND in_stock > 0 AND p.id != $3\n        ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC\n        LIMIT $4\n        OFFSET $5\n        ",
   "describe": {
     "columns": [
       {
@@ -65,7 +65,7 @@
       },
       {
         "ordinal": 12,
-        "name": "members_only!",
+        "name": "members_only",
         "type_info": "Bool"
       },
       {
@@ -81,6 +81,8 @@
     ],
     "parameters": {
       "Left": [
+        "Int4",
+        "Int4",
         "Int4",
         "Int8",
         "Int8"
@@ -104,5 +106,5 @@
       null
     ]
   },
-  "hash": "f8bdcc896f526217c59cb67215845b58cc091e87d78b242e57faa32107b3041d"
+  "hash": "70b40924d11f92d7f944b66c8b3016a4a236910b3015b649a1eb883f9d7b0fe0"
 }

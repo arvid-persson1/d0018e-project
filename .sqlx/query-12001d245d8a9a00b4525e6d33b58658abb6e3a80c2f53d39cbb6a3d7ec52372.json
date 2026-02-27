@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT c.id, parent, review, user_id, username, role AS \"role: Role\", content, c.created_at, c.updated_at,\n            customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,\n            COALESCE(SUM(CASE comment_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END), 0) AS \"sum_votes!\",\n            (\n                SELECT grade\n                FROM comment_votes\n                WHERE customer = $1 AND comment = c.id\n            ) AS \"own_vote: Vote\"\n        FROM comments c\n        JOIN users ON users.id = c.user_id\n        LEFT JOIN customers ON customers.id = c.user_id\n        LEFT JOIN vendors ON vendors.id = c.user_id\n        LEFT JOIN comment_votes ON comment_votes.comment = c.id\n        WHERE review = ANY($2)\n        GROUP BY c.id, username, role, customer_pfp, vendor_pfp\n        ORDER BY review, parent NULLS FIRST, \"sum_votes!\" DESC, created_at\n        ",
+  "query": "\n        SELECT c.id, parent, review, user_id, username, role AS \"role: Role\", content, c.created_at, c.updated_at,\n            customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,\n            COALESCE(SUM(CASE comment_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END), 0) AS \"sum_votes!\"\n        FROM comments c\n        JOIN users ON users.id = c.user_id\n        LEFT JOIN customers ON customers.id = c.user_id\n        LEFT JOIN vendors ON vendors.id = c.user_id\n        LEFT JOIN comment_votes ON comment = c.id\n        WHERE review = ANY($1)\n        GROUP BY c.id, username, role, customer_pfp, vendor_pfp\n        ORDER BY review, parent NULLS FIRST, \"sum_votes!\" DESC, created_at\n        ",
   "describe": {
     "columns": [
       {
@@ -73,26 +73,10 @@
         "ordinal": 11,
         "name": "sum_votes!",
         "type_info": "Int8"
-      },
-      {
-        "ordinal": 12,
-        "name": "own_vote: Vote",
-        "type_info": {
-          "Custom": {
-            "name": "vote",
-            "kind": {
-              "Enum": [
-                "like",
-                "dislike"
-              ]
-            }
-          }
-        }
       }
     ],
     "parameters": {
       "Left": [
-        "Int4",
         "Int4Array"
       ]
     },
@@ -108,9 +92,8 @@
       false,
       true,
       true,
-      null,
       null
     ]
   },
-  "hash": "c5ae728f90aa74b89e59eb65799125e196830dcdb6bc8ff9ec43d86920beb793"
+  "hash": "12001d245d8a9a00b4525e6d33b58658abb6e3a80c2f53d39cbb6a3d7ec52372"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT r.id, rating, created_at, updated_at, title, content,\n            COALESCE(SUM(CASE review_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END), 0) AS \"sum_votes!\"\n        FROM reviews r\n        JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer\n        LEFT JOIN review_votes ON review_votes.review = r.id\n        WHERE r.customer = $1 AND r.product = $2\n        GROUP BY r.id, rating\n        ",
+  "query": "\n        SELECT r.id, rating, created_at, updated_at, title, content,\n            COALESCE(SUM(CASE review_votes.grade\n                WHEN 'like' THEN 1\n                WHEN 'dislike' THEN -1\n            END), 0) AS \"sum_votes!\"\n        FROM reviews r\n        JOIN ratings ON ratings.product = $1 AND ratings.customer = r.customer\n        LEFT JOIN review_votes ON review = r.id\n        WHERE r.customer = $1 AND r.product = $2\n        GROUP BY r.id, rating\n        ",
   "describe": {
     "columns": [
       {
@@ -55,5 +55,5 @@
       null
     ]
   },
-  "hash": "294fa399d0c15636b48ac200d07175b822d2b6eedb1ec4ffb463b76bb1cb82ad"
+  "hash": "686dfe5b3833d4cf50429292601cb3e819926c17366c13c2a2bf0be649111d3c"
 }

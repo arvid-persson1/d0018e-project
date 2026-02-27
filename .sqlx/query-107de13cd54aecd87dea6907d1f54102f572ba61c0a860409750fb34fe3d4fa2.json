@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT delete_user($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delete_user",
+        "type_info": "Void"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "107de13cd54aecd87dea6907d1f54102f572ba61c0a860409750fb34fe3d4fa2"
+}
