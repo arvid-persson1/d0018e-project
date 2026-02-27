@@ -927,28 +927,20 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE OR REPLACE PROCEDURE checkout(customer_id INT)
+CREATE PROCEDURE checkout(customer_id INT)
 LANGUAGE plpgsql AS $$
-DECLARE
-    item_count INT;
 BEGIN
-    -- Can this be made into one statement or an "implicit" table creation?
-    CREATE TEMP TABLE items (
-        product INT,
-        number POSITIVE_INT NOT NULL
-    ) ON COMMIT DROP;
+    CREATE TEMP TABLE items
+    ON COMMIT DROP AS
     WITH deleted AS (
         DELETE FROM shopping_cart_items
         WHERE customer = customer_id
         RETURNING product, number
     )
-    INSERT INTO items
     SELECT product, number
     FROM deleted;
 
-    -- Can this be inlined and the variable removed?
-    GET DIAGNOSTICS item_count = ROW_COUNT;
-    IF item_count = 0 THEN
+    IF NOT FOUND THEN
         RAISE NOTICE 'Checkout with no items.';
         RETURN;
     END IF;
