@@ -550,7 +550,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION sale_remove_expiries(
+CREATE FUNCTION sale_remove_expiries(
     product_id expiries.product%TYPE,
     number INT
 ) RETURNS INT
@@ -927,7 +927,7 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE PROCEDURE checkout(customer_id INT)
+CREATE OR REPLACE PROCEDURE checkout(customer_id INT)
 LANGUAGE plpgsql AS $$
 DECLARE
     item_count INT;
@@ -949,7 +949,7 @@ BEGIN
     -- Can this be inlined and the variable removed?
     GET DIAGNOSTICS item_count = ROW_COUNT;
     IF item_count = 0 THEN
-        -- RAISE NOTICE 'Checkout with no items.';
+        RAISE NOTICE 'Checkout with no items.';
         RETURN;
     END IF;
 
