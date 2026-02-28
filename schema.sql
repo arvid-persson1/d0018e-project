@@ -927,9 +927,42 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE PROCEDURE checkout(customer_id INT)
+CREATE OR REPLACE PROCEDURE checkout(
+    customer_id customers.id%TYPE,
+    expected_offers INT[] DEFAULT NULL
+)
 LANGUAGE plpgsql AS $$
+DECLARE
+    found_offers INT;
 BEGIN
+    PERFORM 1
+    FROM customers
+    WHERE id = customer_id
+    FOR UPDATE;
+
+    CREATE TEMP TABLE applied
+    ON COMMIT DROP AS
+    SELECT s.id, product, new_price, quantity1, quantity2,
+        GREATEST(limit_per_customer - COALESCE(number, 0), 0) AS remaining_uses
+    FROM special_offers s
+    JOIN customers ON customers.id = customer_id
+    LEFT JOIN LATERAL (
+        SELECT number
+        FROM special_offer_uses
+        WHERE special_offer = s.id AND customer = customer_id
+        FOR UPDATE
+    ) sou ON TRUE
+    WHERE valid_from <= CURRENT_TIMESTAMP
+        AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
+        AND (NOT members_only OR member_since IS NOT NULL)
+        AND (expected_offers IS NULL OR s.id = ANY(expected_offers));
+    IF expected_offers IS NOT NULL THEN
+        GET DIAGNOSTICS found_offers := ROW_COUNT;
+        IF found_offers < CARDINALITY(expected_offers) THEN
+            RAISE EXCEPTION 'One or more expected special offers was a duplicate, does not exist, is not active, or the customer is not eligible for it.';
+        END IF;
+    END IF;
+
     CREATE TEMP TABLE items
     ON COMMIT DROP AS
     WITH deleted AS (
@@ -941,9 +974,15 @@ BEGIN
     FROM deleted;
 
     IF NOT FOUND THEN
-        RAISE NOTICE 'Checkout with no items.';
+        -- RAISE NOTICE 'Checkout with no items.';
         RETURN;
     END IF;
+
+    PERFORM id
+    FROM products
+    JOIN items ON product = id
+    ORDER BY id
+    FOR UPDATE;
 
     IF EXISTS (
         SELECT 1
@@ -954,8 +993,8 @@ BEGIN
         RAISE EXCEPTION 'Checkout with missing or invisible product.';
     END IF;
 
+    -- Fails on negative stock.
     UPDATE products
-    -- Fails if negative.
     SET in_stock = in_stock - number
     FROM items
     WHERE id = product;
@@ -963,25 +1002,15 @@ BEGIN
     PERFORM sale_remove_expiries(product, number)
     FROM items;
 
-    CREATE TEMP TABLE results (
-        product INT NOT NULL,
-        number POSITIVE_INT NOT NULL,
-        amount_per_unit TWOPOINT_UDEC NOT NULL,
-        measurement_unit TEXT,
-        price TWOPOINT_UDEC,
-        uses INT NOT NULL,
-        special_offer_id INT
-    ) ON COMMIT DROP;
-    INSERT INTO results
-    SELECT i.product, i.number, amount_per_unit, measurement_unit, price, uses, aso.id
+    CREATE TEMP TABLE results
+    ON COMMIT DROP AS
+    SELECT i.product, number, amount_per_unit, measurement_unit, price, uses, a.id AS special_offer_id
     FROM items i
-    JOIN products ON products.id = product
-    JOIN customers ON customers.id = customer_id
-    LEFT JOIN active_special_offers aso ON aso.product = i.product
-    LEFT JOIN special_offer_uses u ON u.special_offer = aso.id AND u.customer = customer_id
+    JOIN products ON products.id = i.product
+    JOIN applied a ON a.product = i.product
     CROSS JOIN LATERAL calculate_price(
         price,
-        i.number,
+        number,
         new_price,
         quantity1,
         quantity2,

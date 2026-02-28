@@ -4,12 +4,12 @@ use crate::database::{Customer, Id, Product};
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, connection},
+    crate::database::{QueryResultExt, SpecialOffer, connection},
     sqlx::query,
 };
 
 // TODO: Function to get items in cart, include prices with discounts, separate member/nonmember
-// prices?
+// prices? Must include time of reading, see `checkout`.
 
 /// Put `number` units of a product in a customer's shopping cart, *overriding any number
 /// already there*. Setting `number = 0` removes the product from the shopping cart.
@@ -84,18 +84,34 @@ pub async fn remove_deleted_from_cart(customer: Id<Customer>) -> Result<()> {
 
 /// Complete an order for a customer, emptying their shopping cart.
 ///
+/// Calls may also include the IDs of all special offer expected to be applied. This avoids the
+/// case where the customer sees one price based on a special offer active at the time, but the
+/// database calculates a different price because the previously mentioned offer has lapsed. If no
+/// such list is provided, price will be based on whatever special offers are active at the time.
+///
 /// # Errors
 ///
 /// Fails if:
 /// - `customer` is invalid.
+/// - Any offer in `expected_offers` has lapsed.
 /// - The customer has any deleted or invisible products in their cart.
 /// - The customer has more units in their cart than there are in stock.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn checkout(customer: Id<Customer>) -> Result<()> {
-    query!("CALL checkout($1)", customer.get())
-        .execute(connection())
-        .await
-        .map(QueryResultExt::procedure)
-        .map_err(Into::into)
+pub async fn checkout(
+    customer: Id<Customer>,
+    expected_offers: Option<Box<[Id<SpecialOffer>]>>,
+) -> Result<()> {
+    // This should be a no-op.
+    let expected_offers =
+        expected_offers.map(|ids| ids.into_iter().map(Id::get).collect::<Box<_>>());
+    query!(
+        "CALL checkout($1, $2)",
+        customer.get(),
+        expected_offers.as_deref(),
+    )
+    .execute(connection())
+    .await
+    .map(QueryResultExt::procedure)
+    .map_err(Into::into)
 }
