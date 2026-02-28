@@ -1,10 +1,10 @@
 //! Database functions for interacting with a customer's shopping cart.
 
-use crate::database::{Customer, Id, Product};
+use crate::database::{Customer, Id, Product, SpecialOffer};
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, SpecialOffer, connection},
+    crate::database::{QueryResultExt, connection},
     sqlx::query,
 };
 
