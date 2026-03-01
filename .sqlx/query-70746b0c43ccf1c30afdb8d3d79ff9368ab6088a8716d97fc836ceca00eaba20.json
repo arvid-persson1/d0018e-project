@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT time, paid, special_offer_used, number, o.amount_per_unit, o.measurement_unit,\n            p.name AS product_name, p.thumbnail,\n            display_name AS vendor_name\n        FROM orders o\n        JOIN products p ON p.id = o.product\n        JOIN vendors ON vendors.id = p.vendor\n        WHERE customer = $1\n        ORDER BY time DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "time",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 1,
+        "name": "paid",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "special_offer_used",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "amount_per_unit",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "measurement_unit",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "product_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "thumbnail",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "vendor_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "70746b0c43ccf1c30afdb8d3d79ff9368ab6088a8716d97fc836ceca00eaba20"
+}

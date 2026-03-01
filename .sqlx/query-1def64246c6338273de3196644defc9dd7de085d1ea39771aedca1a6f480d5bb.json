@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT r.product, thumbnail, rating, title, content, name AS product_name\n        FROM reviews r\n        JOIN products ON products.id = r.product\n        JOIN ratings ON ratings.customer = $1 AND ratings.product = r.product\n        WHERE r.customer = $1\n        ORDER BY r.updated_at DESC\n        LIMIT $2\n        OFFSET $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "thumbnail",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "rating",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "product_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1def64246c6338273de3196644defc9dd7de085d1ea39771aedca1a6f480d5bb"
+}

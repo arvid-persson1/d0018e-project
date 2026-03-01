@@ -1,11 +1,12 @@
 use crate::Route;
-use crate::components::product_card::ProductCard;
+use crate::components::ProductCard;
 use crate::fake_data::get_fake_products;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
+/// Favorites page.
 #[component]
-pub fn Favorites() -> Element {
+pub fn FavoritesPage() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
     // TODO(db): Ersätt get_fake_products() med ett API-anrop
     let products = get_fake_products();

@@ -16,7 +16,7 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<String>) -> Elemen
 
                 // Länk till kategorisidan med rätt ID
                 Link {
-                    to: Route::Category { id },
+                    to: Route::Category { id: id.into() },
                     class: "font-bold text-gray-800 hover:text-green-700 flex-grow",
                     "{title}"
                 }
@@ -40,6 +40,7 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<String>) -> Elemen
     }
 }
 
+/// Navbar.
 #[component]
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
@@ -127,7 +128,7 @@ pub fn Navbar() -> Element {
 
                         div { class: "p-6 flex justify-between items-center border-b bg-gray-700 text-white",
                             Link {
-                                to: Route::Category { id: 0 },
+                                to: Route::Category { id: 0.into() },
                                 onclick: move |_| show_sidebar.set(false),
                                 h2 { class: "text-xl font-black hover:text-green-400 cursor-pointer",
                                     "Kategorier"

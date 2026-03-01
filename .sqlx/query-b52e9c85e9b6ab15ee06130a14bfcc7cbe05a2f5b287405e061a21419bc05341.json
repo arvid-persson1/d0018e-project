@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM shopping_cart_items\n            WHERE customer = $1 AND product = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b52e9c85e9b6ab15ee06130a14bfcc7cbe05a2f5b287405e061a21419bc05341"
+}

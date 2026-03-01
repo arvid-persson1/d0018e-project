@@ -2,41 +2,88 @@ name: CI
 
 on:
   push:
+    paths:
+      - .github/workflows/**
+      - clippy.toml
+      - rust-toolchain.toml
+      - src/**
+      - Dioxus.toml
+      - rustfmt.toml
+      - taplo.toml
+      - Cargo.toml
 
 env:
-  RUSTDOCFLAGS: "-Dwarnings"
+  RUST_BACKTRACE: 1
+  RUSTDOCFLAGS: -Dwarnings
+  SQLX_OFFLINE: true
 
 jobs:
-  ci:
-    name: ci
+  fmt:
+    name: Format (Rust)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
-          components: |
-            rustfmt
-            clippy
-          target: wasm32-unknown-unknown
+          components: rustfmt
+      - run: cargo fmt --all --verbose -- --check
 
-      - name: Install Dioxus CLI
-        run: curl -sSL https://dioxus.dev/install.sh | bash
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+      - run: cargo check --all-targets
+      - run: cargo check --all-targets -F server
 
-      - name: Format (Rust)
-        run: cargo fmt -- --check
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt
+      - run: cargo doc --no-deps --document-private-items
+      - run: cargo doc --no-deps --document-private-items -F server 
 
-      - name: Compile
-        run: dx check
+  clippy:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: clippy
+      - run: cargo clippy --all-targets --future-incompat-report
+      - run: cargo clippy --all-targets --future-incompat-report -F server
 
-      - name: Lint
-        run: cargo clippy
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+      - run: cargo test --all-targets
 
-      - name: Build documentation
-        run: cargo rustdoc -- -Z unstable-options --check
-
-      - name: Tests
-        run: cargo test --verbose
+  dioxus:
+    name: Dioxus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall dioxus-cli@0.7.1 --force --no-confirm
+      - run: dx fmt --check
+      - run: dx check --verbose

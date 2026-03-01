@@ -1,0 +1,104 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,\n            new_price, quantity1, quantity2, members_only,\n            EXISTS (\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\"\n        FROM products p\n        LEFT JOIN active_special_offers ON product = p.id\n        WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0\n        ORDER BY average_discount(p.price, new_price, quantity1, quantity2) DESC, p.name\n        LIMIT $3\n        OFFSET $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "thumbnail",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "overview",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "in_stock",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "origin",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "amount_per_unit",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "measurement_unit",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "new_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "quantity1",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "quantity2",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "members_only",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 13,
+        "name": "favorited!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Int8",
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "8544e747fde031df4cd10cac77aa4d50002187f8f37d07d07eee17355fbb6395"
+}

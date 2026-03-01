@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO review_votes (customer, review, grade)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (customer, review) DO UPDATE\n            SET grade = EXCLUDED.grade\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        {
+          "Custom": {
+            "name": "vote",
+            "kind": {
+              "Enum": [
+                "like",
+                "dislike"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4955c1c5fd879da4be84b3dc6021468ab0ae1ee8337dcec1bcbcbec1f22a7392"
+}

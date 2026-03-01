@@ -1,14 +1,14 @@
 use crate::Route;
-use crate::components::product_card::ProductCard;
+use crate::components::ProductCard;
 use crate::fake_data::get_fake_products;
 use crate::state::GlobalState;
+use crate::{Id, Product};
 use dioxus::prelude::*;
 
-// Class for product page
 #[component]
-pub fn Product(id: i32) -> Element {
+pub fn ProductPage(id: Id<Product>) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
-    let is_favorite = global_state.read().favorites.contains(&id);
+    let is_favorite = global_state.read().favorites.contains(&id.get());
     let product_id = id;
     let nav = use_navigator();
 
@@ -22,7 +22,7 @@ pub fn Product(id: i32) -> Element {
     let products = get_fake_products();
     let product = products
         .iter()
-        .find(|p| p.id == id)
+        .find(|p| Id::from(p.id) == id)
         .cloned()
         .unwrap_or(products[0].clone());
 
@@ -68,7 +68,9 @@ pub fn Product(id: i32) -> Element {
             // Tillbaka knapp
             button {
                 onclick: move |_| {
-                    nav.push(Route::Home {});
+                    if let Some(err) = nav.push(Route::Home {}) {
+                        panic!("{:?}", err);
+                    }
                 },
                 class: "text-green-700 font-bold mb-4 flex items-center gap-2 hover:underline",
                 i { class: "fa-solid fa-arrow-left" }
@@ -114,11 +116,11 @@ pub fn Product(id: i32) -> Element {
                     // Varukorg knappen
                     // TODO(db): cart_items ska sparas i databasen istället för GlobalState
                     div { class: "flex gap-4 items-center h-16",
-                        if global_state.read().cart_items.iter().filter(|&&item_id| item_id == id).count() == 0 {
+                        if global_state.read().cart_items.iter().filter(|&&item_id| Id::from(item_id) == id).count() == 0 {
                             button {
                                 class: "flex-grow h-full bg-green-700 text-white rounded-full font-black text-xl hover:bg-green-800 transition-colors shadow-md flex items-center justify-center gap-3",
                                 onclick: move |_| {
-                                    global_state.write().cart_items.push(id);
+                                    global_state.write().cart_items.push(id.get());
                                 },
                                 i { class: "fa-solid fa-cart-plus" }
                                 "LÄGG I VARUKORG"
@@ -129,20 +131,20 @@ pub fn Product(id: i32) -> Element {
                                     class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
                                     onclick: move |_| {
                                         let mut state = global_state.write();
-                                        if let Some(pos) = state.cart_items.iter().position(|&x| x == id) {
-                                            state.cart_items.remove(pos);
+                                        if let Some(pos) = state.cart_items.iter().position(|&x| Id::from(x) == id) {
+                                            _ = state.cart_items.remove(pos);
                                         }
                                     },
                                     i { class: "fas fa-minus" }
                                 }
                                 span { class: "font-black text-2xl text-green-900",
-                                    "{global_state.read().cart_items.iter().filter(|&&item_id| item_id == id).count()}"
+                                    "{global_state.read().cart_items.iter().filter(|&&item_id| Id::from(item_id) == id).count()}"
                                 }
 
                                 button {
                                     class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
                                     onclick: move |_| {
-                                        global_state.write().cart_items.push(id);
+                                        global_state.write().cart_items.push(id.into());
                                     },
                                     i { class: "fas fa-plus" }
                                 }
@@ -155,10 +157,10 @@ pub fn Product(id: i32) -> Element {
                             class: "h-full px-6 border-2 border-gray-200 rounded-full transition-all {heart_class}",
                             onclick: move |_| {
                                 let mut state = global_state.write();
-                                if state.favorites.contains(&product_id) {
-                                    state.favorites.retain(|&x| x != product_id);
+                                if state.favorites.contains(&product_id.get()) {
+                                    state.favorites.retain(|&x| Id::from(x) != product_id);
                                 } else {
-                                    state.favorites.push(product_id);
+                                    state.favorites.push(product_id.into());
                                 }
                             },
                             if is_favorite {
@@ -176,7 +178,7 @@ pub fn Product(id: i32) -> Element {
             div { class: "border-t pt-16 mb-16",
                 h2 { class: "text-3xl font-black mb-8 text-gray-900", "Liknande produkter" }
                 div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6",
-                    for p in products.iter().filter(|p| p.id != id).take(4) {
+                    for p in products.iter().filter(|p| Id::from(p.id) != id).take(4) {
                         // TODO(db): ProductCard är samma, bara datan ändras
                         ProductCard {
                             id: p.id,

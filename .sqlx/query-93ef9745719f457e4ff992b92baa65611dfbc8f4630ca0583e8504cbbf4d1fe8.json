@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT product, number\n        FROM shopping_cart_items\n        WHERE customer = $1 AND product IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "number",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "93ef9745719f457e4ff992b92baa65611dfbc8f4630ca0583e8504cbbf4d1fe8"
+}

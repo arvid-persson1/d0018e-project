@@ -1,0 +1,204 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT name, thumbnail, price, p.description, in_stock, origin,\n            gallery AS \"gallery: Vec<String>\",\n            amount_per_unit, measurement_unit, visible, created_at, updated_at,\n            new_price, quantity1, quantity2, members_only, limit_per_customer,\n            vendors.id AS vendor_id, vendors.display_name AS vendor_name,\n            category_path(category) AS \"category_path!: Vec<CategoryPathSegment>\",\n            AVG(ratings.rating::FLOAT) AS average_rating,\n            COUNT(ratings.rating) AS \"rating_count!\",\n            EXISTS (\n                SELECT 1\n                FROM customer_favorites cf\n                WHERE cf.customer = $1 AND cf.product = p.id\n            ) AS \"favorited!\",\n            (\n                SELECT rating\n                FROM ratings\n                WHERE customer = $1 AND product = $2\n            ) AS own_rating,\n            EXISTS (\n                SELECT 1\n                FROM orders\n                WHERE customer = $1 AND product = $2\n            ) AS \"has_purchased!\"\n        FROM products p\n        LEFT JOIN active_special_offers ON product = p.id\n        JOIN vendors ON vendors.id = vendor\n        LEFT JOIN ratings ON ratings.product = p.id\n        WHERE p.id = $1\n        GROUP BY p.id, vendors.id, new_price, quantity1, quantity2, members_only, limit_per_customer\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "thumbnail",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "in_stock",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "origin",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "gallery: Vec<String>",
+        "type_info": {
+          "Custom": {
+            "name": "url[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "url",
+                  "kind": {
+                    "Domain": "Text"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "amount_per_unit",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "measurement_unit",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "visible",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 12,
+        "name": "new_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "quantity1",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "quantity2",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "members_only",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 16,
+        "name": "limit_per_customer",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "vendor_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 18,
+        "name": "vendor_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "category_path!: Vec<CategoryPathSegment>",
+        "type_info": {
+          "Custom": {
+            "name": "category_path_segment[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "category_path_segment",
+                  "kind": {
+                    "Composite": [
+                      [
+                        "id",
+                        "Int4"
+                      ],
+                      [
+                        "name",
+                        "Text"
+                      ]
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "average_rating",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 21,
+        "name": "rating_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 22,
+        "name": "favorited!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 23,
+        "name": "own_rating",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 24,
+        "name": "has_purchased!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "8afc6e069dc51b1eb43aaa5c9d31c16459d1cf0a57aed77caac6764494ab6a82"
+}

@@ -1,12 +1,11 @@
 use crate::Route;
-use crate::components::product_card::ProductCard;
+use crate::components::ProductCard;
 use crate::fake_data::get_fake_products;
+use crate::{Category, Id};
 use dioxus::prelude::*;
 
-// A page for categorys
-
 #[component]
-pub fn Category(id: i32) -> Element {
+pub fn CategoryPage(id: Id<Category>) -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop eller databas-query
     let products = get_fake_products();
 
@@ -33,14 +32,14 @@ pub fn Category(id: i32) -> Element {
                     nav { class: "flex flex-col gap-3",
                         // Aktiv länk = grön, inaktiv = grå
                         Link {
-                            to: Route::Category { id: 0 },
-                            class: if id == 0 { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
+                            to: Route::Category { id: 0.into() },
+                            class: if id == 0.into() { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
                             "Visa alla kategorier"
                         }
                         for (cat_id , name , _pos) in categories.clone() {
                             Link {
-                                to: Route::Category { id: cat_id },
-                                class: if id == cat_id { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
+                                to: Route::Category { id: cat_id.into() },
+                                class: if id == cat_id.into() { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
                                 "{name}"
                             }
                         }
@@ -50,13 +49,13 @@ pub fn Category(id: i32) -> Element {
 
             main { class: "flex-grow overflow-hidden",
                 // Rubrik
-                if id == 0 {
+                if id == 0.into() {
                     h1 { class: "text-4xl font-black mb-8 text-gray-900", "Kategorier" }
                 }
 
                 // räkna ut steg för scrollning
                 for (cat_id , cat_name , mut pos) in categories {
-                    if id == 0 || id == cat_id {
+                    if id == 0.into() || id == cat_id.into() {
                         {
                             let current_pos = *pos.read();
                             let offset = current_pos * 100;
@@ -79,7 +78,7 @@ pub fn Category(id: i32) -> Element {
                                         }
                                         // Visa allt knapp
                                         Link {
-                                            to: Route::Category { id: cat_id },
+                                            to: Route::Category { id: cat_id.into() },
                                             class: "flex items-center gap-2 text-green-700 font-bold hover:text-green-800 transition-colors bg-green-50 px-4 py-2 rounded-full text-sm",
                                             "Visa alla {cat_name}"
                                             i { class: "fa-solid fa-chevron-right text-xs" }
@@ -107,7 +106,7 @@ pub fn Category(id: i32) -> Element {
                                     // Dot-indikator
                                     // Grid-läge på enskild kategori
                                     // TODO(db): ProductCard är samma, bara datan ändras
-                                    if id == 0 {
+                                    if id == 0.into() {
                                         div { class: "relative group",
 
                                             if current_pos > 0 && total_cards > 4 {
@@ -146,7 +145,7 @@ pub fn Category(id: i32) -> Element {
                                                         }
                                                     } else {
                                                         div { class: "min-w-full md:min-w-[25%] p-2",
-                                                            Link { to: Route::Category { id: cat_id },
+                                                            Link { to: Route::Category { id: cat_id.into() },
                                                                 div { class: "h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:bg-green-100 transition-all min-h-[380px]",
                                                                     div { class: "text-center p-4",
                                                                         i { class: "fa-solid fa-arrow-right-long text-4xl text-green-700 mb-3" }

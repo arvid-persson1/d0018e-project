@@ -1,9 +1,9 @@
 use dioxus::prelude::*;
 
-use crate::components::product_card::ProductCard;
+use crate::components::ProductCard;
 use crate::fake_data::get_fake_products;
 
-// Class for the home page
+/// Home page..
 #[component]
 pub fn Home() -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop

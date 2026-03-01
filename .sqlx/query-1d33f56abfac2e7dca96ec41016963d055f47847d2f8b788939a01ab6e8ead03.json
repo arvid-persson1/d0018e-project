@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE special_offers\n        SET valid_from = $2\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Timestamp"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1d33f56abfac2e7dca96ec41016963d055f47847d2f8b788939a01ab6e8ead03"
+}

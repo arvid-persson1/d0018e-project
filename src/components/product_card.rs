@@ -3,7 +3,8 @@ use crate::state::GlobalState;
 use dioxus::prelude::*;
 
 // class for a product card
-#[derive(Props, Clone, PartialEq)]
+#[derive(Props, Debug, Clone, PartialEq)]
+#[expect(missing_docs, reason = "TODO")]
 pub struct ProductProps {
     pub id: i32,
     pub name: String,
@@ -12,6 +13,7 @@ pub struct ProductProps {
     pub comparison_price: String,
 }
 
+/// Product card.
 #[component]
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
@@ -36,7 +38,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
         div { class: "bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition p-4 flex flex-col gap-3 relative",
 
             // länk i bilden för produktsidan
-            Link { to: Route::Product { id: props.id },
+            Link { to: Route::Product { id: props.id.into() },
                 img {
                     src: "{props.image_url}",
                     class: "w-full h-60 object-contain mb-2 cursor-pointer hover:opacity-80 transition",
@@ -45,7 +47,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
 
             div { class: "flex flex-col gap-0.5",
                 // länk i namnet för produktsidan
-                Link { to: Route::Product { id: props.id },
+                Link { to: Route::Product { id: props.id.into() },
                     h3 { class: "font-bold text-lg text-gray-800 hover:text-green-700 cursor-pointer",
                         "{props.name}"
                     }
@@ -75,7 +77,7 @@ pub fn ProductCard(props: ProductProps) -> Element {
                                 // TODO(db): Ersätt med ett API-anrop som tar bort produkten från köparens varukorg
                                 let mut state = global_state.write();
                                 if let Some(pos) = state.cart_items.iter().position(|&x| x == product_id) {
-                                    state.cart_items.remove(pos);
+                                    _ = state.cart_items.remove(pos);
                                 }
                             },
                             i { class: "fas fa-minus" }

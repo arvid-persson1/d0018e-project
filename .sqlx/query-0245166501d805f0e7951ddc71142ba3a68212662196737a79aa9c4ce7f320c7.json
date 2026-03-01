@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO products (\n            vendor, name, thumbnail, gallery, price, overview, description,\n            origin, category, amount_per_unit, measurement_unit\n        )\n        VALUES (\n            $1, $2, $3::TEXT, $4::TEXT[], $5::DECIMAL(10, 2), $6, $7,\n            $8, $9, $10::DECIMAL(10, 2), $11\n        )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Text",
+        "TextArray",
+        "Numeric",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Numeric",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0245166501d805f0e7951ddc71142ba3a68212662196737a79aa9c4ce7f320c7"
+}

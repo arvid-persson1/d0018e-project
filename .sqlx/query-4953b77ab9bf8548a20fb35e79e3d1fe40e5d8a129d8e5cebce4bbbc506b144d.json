@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "CALL set_visibility($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4953b77ab9bf8548a20fb35e79e3d1fe40e5d8a129d8e5cebce4bbbc506b144d"
+}

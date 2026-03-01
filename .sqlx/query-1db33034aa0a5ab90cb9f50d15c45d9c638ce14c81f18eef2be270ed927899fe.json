@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "CALL checkout($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1db33034aa0a5ab90cb9f50d15c45d9c638ce14c81f18eef2be270ed927899fe"
+}

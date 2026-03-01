@@ -1,5 +1,14 @@
 allow-exact-repetitions = true
+await-holding-invalid-types = [
+    "dioxus_signals::WriteLock",
+    "generational_box::GenerationalRef",
+    "generational_box::GenerationalRefMut",
+    { path = "dioxus_signals::WriteLock", reason = "Write should not be held over an await point. This will cause any reads or writes to fail while the await is pending since the write borrow is still active." },
+    { path = "generational_box::GenerationalRef", reason = "Reads should not be held over an await point. This will cause any writes to fail while the await is pending since the read borrow is still active." },
+    { path = "generational_box::GenerationalRefMut", reason = "Write should not be held over an await point. This will cause any reads or writes to fail while the await is pending since the write borrow is still active." },
+]
 check-private-items = true
+doc-valid-idents = ["..", "SQLx"]
 enforce-iter-loop-reborrow = true
 enum-variant-name-threshold = 1
 excessive-nesting-threshold = 5
@@ -13,6 +22,4 @@ module-items-ordered-within-groupings = "none"
 single-char-binding-names-threshold = 4
 source-item-ordering = []
 struct-field-name-threshold = 1
-too-many-arguments-threshold = 7
-too-many-lines-threshold = 100
 upper-case-acronyms-aggressive = true
