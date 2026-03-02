@@ -927,7 +927,7 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE OR REPLACE PROCEDURE checkout(
+CREATE PROCEDURE checkout(
     customer_id customers.id%TYPE,
     expected_offers INT[] DEFAULT NULL
 )
@@ -974,7 +974,7 @@ BEGIN
     FROM deleted;
 
     IF NOT FOUND THEN
-        -- RAISE NOTICE 'Checkout with no items.';
+        RAISE NOTICE 'Checkout with no items.';
         RETURN;
     END IF;
 
@@ -1032,3 +1032,4 @@ BEGIN
     FROM results;
 END;
 $$;
+
