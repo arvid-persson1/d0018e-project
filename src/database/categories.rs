@@ -5,7 +5,7 @@ use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, RawId, connection},
+    crate::database::{POOL, QueryResultExt, RawId},
     hashbrown::HashMap,
     sqlx::{query, query_as},
 };
@@ -67,7 +67,7 @@ pub async fn category_trees() -> Result<Box<[CategoryTree]>> {
         ORDER BY parent NULLS FIRST, name
         ",
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await?;
     debug_assert!(categories.is_sorted(), "Rows not sorted.");
 
@@ -128,7 +128,7 @@ pub async fn create_category(parent: Option<Id<Category>>, name: Box<str>) -> Re
         parent.map(Id::get),
         &name
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -151,7 +151,7 @@ pub async fn delete_category(category: Id<Category>) -> Result<()> {
         ",
         category.get()
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }

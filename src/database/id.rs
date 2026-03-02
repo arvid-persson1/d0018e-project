@@ -108,7 +108,6 @@ mod private {
 use private::Sealed;
 
 /// A type that can be used as an [`Id`].
-#[expect(unnameable_types, reason = "Sealed.")]
 pub trait Key: Sealed + 'static {}
 
 /// Marker for product IDs.

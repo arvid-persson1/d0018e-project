@@ -15,10 +15,6 @@ derive_more = { default-features = false, features = [
 ], version = "2.1.1" }
 dioxus = { features = ["fullstack", "router"], version = "0.7.1" }
 dotenvy = { default-features = false, optional = true, version = "0.15.7" }
-futures = { default-features = false, features = [
-    "executor",
-    "std",
-], optional = true, version = "0.3.31" }
 hashbrown = { default-features = false, features = [
     "alloc",
     "default-hasher",
@@ -52,7 +48,7 @@ tokio = { default-features = false, features = [
 
 [features]
 default = ["web"]
-server = ["dep:dotenvy", "dep:futures", "dep:sqlx", "dep:tokio", "dioxus/server"]
+server = ["dep:dotenvy", "dep:sqlx", "dep:tokio", "dioxus/server"]
 web = ["dioxus/web"]
 
 [profile.dev]

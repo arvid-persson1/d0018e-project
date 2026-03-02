@@ -6,11 +6,10 @@
     reason = "Generates a lot of noise for mappings. Documentation is delegated to either corresponding public items, or database schema."
 )]
 
-use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use {
+    crate::dioxus_fullstack::Lazy,
     sqlx::{PgPool as Pool, postgres::PgQueryResult as QueryResult, query},
-    tokio::sync::OnceCell,
 };
 
 mod types;
@@ -36,55 +35,23 @@ pub mod products;
 pub mod reviews;
 pub mod users;
 
-/// The shared connection to the database.
 #[cfg(feature = "server")]
-static CONNECTION: OnceCell<Pool> = OnceCell::const_new();
+static POOL: Lazy<Pool> = Lazy::new(|| async move {
+    let database_url = dotenvy::var("DATABASE_URL").expect("`DATABASE_URL` not set.");
 
-/// Initializes the database connection.
-///
-/// This function should be called once at program startup. Attempting to call any other database
-/// function before this one will cause a panic. Calling this function multiple times does nothing.
-///
-/// # Panics
-///
-/// Panics if establishing a connection fails or if database startup code fails to run.
-#[server]
-#[expect(clippy::missing_errors_doc, reason = "Implementation doesn't fail.")]
-pub async fn init_connection(url: String) -> Result<()> {
-    if matches!(
-        CONNECTION.set(
-            Pool::connect(&url)
-                .await
-                .expect("Failed to establish a connection to the database."),
-        ),
-        Ok(())
-    ) {
-        // Startup code.
-        #[expect(clippy::unwrap_used, reason = "Cell was just initialized.")]
-        let res = query!("SELECT process_expiries();")
-            .fetch_all(CONNECTION.get().unwrap())
-            .await
-            .expect("Failed to run database startup code.");
-        drop(res);
-    }
+    let pool = Pool::connect(&database_url)
+        .await
+        .expect("Failed to establish a connection to the database.");
 
-    Ok(())
-}
+    #[expect(clippy::unwrap_used, reason = "Cell was just initialized.")]
+    let res = query!("SELECT process_expiries();")
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to run database startup code.");
+    drop(res);
 
-/// Get a handle to the database connection.
-///
-/// This is a convenience wrapper around `CONNECTION`, handling non-initialized state with a
-/// custom panic message.
-///
-/// # Panics
-///
-/// Panics if the connection has not been initialized (see [`init_connection`]).
-#[cfg(feature = "server")]
-fn connection() -> &'static Pool {
-    CONNECTION
-        .get()
-        .expect("Database connection not initialized.")
-}
+    Ok::<_, !>(pool)
+});
 
 /// Extension trait to make decisions based on the number of rows affected by a query.
 ///

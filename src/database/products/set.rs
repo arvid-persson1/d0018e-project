@@ -7,7 +7,7 @@ use std::num::NonZeroU32;
 use time::Date;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, connection},
+    crate::database::{POOL, QueryResultExt},
     sqlx::{query, query_as, query_scalar},
     std::num::NonZero,
 };
@@ -58,7 +58,7 @@ pub async fn create_product(
         amount.quantity(),
         amount.unit(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -82,7 +82,7 @@ pub async fn set_product_name(product: Id<Product>, name: Box<str>) -> Result<()
         product.get(),
         &name,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -105,7 +105,7 @@ pub async fn set_thumbnail(product: Id<Product>, url: Url) -> Result<()> {
         product.get(),
         &url,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -132,7 +132,7 @@ pub async fn gallery(product: Id<Product>) -> Result<Box<[Url]>> {
         "#,
         product.get(),
     )
-    .fetch_one(connection())
+    .fetch_one(&*POOL)
     .await
     .map(|GalleryRepr { gallery }| gallery.into())
     .map_err(Into::into)
@@ -158,7 +158,7 @@ pub async fn set_gallery(product: Id<Product>, gallery: Box<[String]>) -> Result
         product.get(),
         &*gallery,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -183,7 +183,7 @@ pub async fn add_to_gallery(product: Id<Product>, additions: Box<[String]>) -> R
         product.get(),
         &*additions,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -207,7 +207,7 @@ pub async fn set_price(product: Id<Product>, price: Decimal) -> Result<()> {
         product.get(),
         price,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -230,7 +230,7 @@ pub async fn set_overview(product: Id<Product>, overview: Box<str>) -> Result<()
         product.get(),
         &overview,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -253,7 +253,7 @@ pub async fn set_description(product: Id<Product>, description: Box<str>) -> Res
         product.get(),
         &description,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -276,7 +276,7 @@ pub async fn set_category(product: Id<Product>, category: Id<Category>) -> Resul
         product.get(),
         category.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -300,7 +300,7 @@ pub async fn set_amount(product: Id<Product>, amount: Amount) -> Result<()> {
         amount.quantity(),
         amount.unit(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -323,7 +323,7 @@ pub async fn set_origin(product: Id<Product>, origin: Box<str>) -> Result<()> {
         product.get(),
         &origin,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -355,7 +355,7 @@ pub async fn add_stock(
         i32::try_from(number.get())?,
         expiry,
     )
-    .fetch_one(connection())
+    .fetch_one(&*POOL)
     .await
     .map(|new_stock| {
         u32::try_from(new_stock.expect("Database didn't return new stock."))
@@ -380,7 +380,7 @@ pub async fn add_stock(
 pub async fn set_visibility(product: Id<Product>, visible: bool) -> Result<()> {
     // PERF: First subquery not currently supported by an index.
     query!("CALL set_visibility($1, $2)", product.get(), visible)
-        .execute(connection())
+        .execute(&*POOL)
         .await
         .map(QueryResultExt::procedure)
         .map_err(Into::into)
@@ -419,7 +419,7 @@ pub async fn set_favorite(
             product.get(),
         )
     }
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_maybe)
     .map_err(Into::into)
@@ -450,7 +450,7 @@ pub async fn set_rating(
         product.get(),
         i32::from(rating.get().get()),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -474,7 +474,7 @@ pub async fn remove_rating(customer: Id<Customer>, product: Id<Product>) -> Resu
         customer.get(),
         product.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }

@@ -1,6 +1,7 @@
 //! The entrypoint for the app.
 
 #![feature(iter_collect_into)]
+#![feature(never_type)]
 #![cfg_attr(feature = "server", expect(clippy::todo, reason = "TODO"))]
 
 pub mod components;
@@ -13,8 +14,6 @@ mod state;
 
 use dioxus::prelude::*;
 use views::{CategoryPage, FavoritesPage, Home, ProductPage, ProfilePage, VendorPage};
-#[cfg(feature = "server")]
-use {database::init_connection, futures::executor::block_on};
 
 /// Structure of all non-internal endpoints.
 #[derive(Debug, Clone, PartialEq, Routable)]
@@ -68,12 +67,5 @@ fn App() -> Element {
 }
 
 fn main() {
-    #[cfg(feature = "server")]
-    {
-        let database_url = dotenvy::var("DATABASE_URL").expect("`DATABASE_URL` not set.");
-        block_on(init_connection(database_url))
-            .expect("Failed to establish a connection to the database.");
-    }
-
-    launch(App);
+    launch(App)
 }
