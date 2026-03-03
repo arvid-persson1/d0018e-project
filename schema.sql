@@ -451,6 +451,7 @@ FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
 -- allows due to the limit having changed. Similarly, it is possible for a non-member to have used
 -- members-only special offer due to the status of the latter having changed. These are not errors
 -- and nothing should be changed about the history, it should only prevent future uses.
+-- NOTE: Rows with 0 uses are allowed to serve as locks in `checkout`.
 CREATE TABLE special_offer_uses (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     special_offer INT NOT NULL REFERENCES special_offers(id) ON DELETE CASCADE,
@@ -485,11 +486,18 @@ CREATE FUNCTION process_expiries() RETURNS TABLE (
     -- does *not* represent the number of products that actually expired.
     total BIGINT
 ) LANGUAGE sql VOLATILE AS $$
-    WITH product_lock AS (
-        SELECT id
-        FROM products
-        JOIN pending_expiries ON pending_expiries.product = products.id
-        FOR UPDATE OF products
+    WITH products_lock AS (
+        SELECT p.id
+        FROM products p
+        JOIN pending_expiries ON pending_expiries.product = p.id
+        ORDER BY p.id
+        FOR NO KEY UPDATE OF products
+    ),
+    expiries_lock AS (
+        SELECT 1
+        FROM pending_expiries
+        ORDER BY product, expiry
+        FOR NO KEY UPDATE
     ),
     processed AS (
         UPDATE pending_expiries
@@ -534,6 +542,15 @@ LANGUAGE plpgsql AS $$
 DECLARE
     new_stock INT;
 BEGIN
+    -- Consistent lock order with `checkout`.
+    PERFORM 1
+    FROM products
+    WHERE id = product_id
+    FOR KEY SHARE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Product does not exist.';
+    END IF;
+
     IF expiry IS NOT NULL THEN
         INSERT INTO expiries (product, expiry, number)
         VALUES (product_id, expiry, number)
@@ -569,7 +586,7 @@ BEGIN
         FROM expiries
         WHERE product = product_id AND processed_at IS NULL
         ORDER BY expiry
-        FOR UPDATE
+        FOR NO KEY UPDATE
     LOOP
         IF current_number > remaining THEN
             UPDATE expiries
@@ -927,8 +944,11 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE OR REPLACE PROCEDURE checkout(
+CREATE PROCEDURE checkout(
     customer_id customers.id%TYPE,
+    -- If this is nonnull, customer has seen that these offers should apply to their purchase.
+    -- Instead of getting active special offers the customer is eligible for, get these specifically
+    -- and check for validity and eligibility. Also fails if this contains duplicates.
     expected_offers INT[] DEFAULT NULL
 )
 LANGUAGE plpgsql AS $$
@@ -938,29 +958,9 @@ BEGIN
     PERFORM 1
     FROM customers
     WHERE id = customer_id
-    FOR UPDATE;
-
-    CREATE TEMP TABLE applied
-    ON COMMIT DROP AS
-    SELECT s.id, product, new_price, quantity1, quantity2,
-        GREATEST(limit_per_customer - COALESCE(number, 0), 0) AS remaining_uses
-    FROM special_offers s
-    JOIN customers ON customers.id = customer_id
-    LEFT JOIN LATERAL (
-        SELECT number
-        FROM special_offer_uses
-        WHERE special_offer = s.id AND customer = customer_id
-        FOR UPDATE
-    ) sou ON TRUE
-    WHERE valid_from <= CURRENT_TIMESTAMP
-        AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
-        AND (NOT members_only OR member_since IS NOT NULL)
-        AND (expected_offers IS NULL OR s.id = ANY(expected_offers));
-    IF expected_offers IS NOT NULL THEN
-        GET DIAGNOSTICS found_offers := ROW_COUNT;
-        IF found_offers < CARDINALITY(expected_offers) THEN
-            RAISE EXCEPTION 'One or more expected special offers was a duplicate, does not exist, is not active, or the customer is not eligible for it.';
-        END IF;
+    FOR KEY SHARE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Customer does not exist.';
     END IF;
 
     CREATE TEMP TABLE items
@@ -970,27 +970,68 @@ BEGIN
         WHERE customer = customer_id
         RETURNING product, number
     )
-    SELECT product, number
+    SELECT *
     FROM deleted;
-
     IF NOT FOUND THEN
-        -- RAISE NOTICE 'Checkout with no items.';
+        RAISE NOTICE 'Checkout with no items.';
         RETURN;
     END IF;
 
-    PERFORM id
-    FROM products
-    JOIN items ON product = id
-    ORDER BY id
-    FOR UPDATE;
+    PERFORM p.id
+    FROM products p
+    JOIN items ON items.product = p.id
+    ORDER BY p.id
+    FOR NO KEY UPDATE;
 
     IF EXISTS (
         SELECT 1
         FROM items
-        LEFT JOIN products ON id = product
-        WHERE id IS NULL OR NOT visible
+        LEFT JOIN products p ON p.id = items.product
+        WHERE p.id IS NULL OR NOT p.visible
     ) THEN
         RAISE EXCEPTION 'Checkout with missing or invisible product.';
+    END IF;
+
+    CREATE TEMP TABLE applied
+    ON COMMIT DROP AS
+    -- Filter offers first to avoid creating unnecessary rows, see below.
+    WITH eligible_offers AS (
+        SELECT s.id, s.product, s.new_price, s.quantity1, s.quantity2, s.limit_per_customer
+        FROM special_offers s
+        JOIN customers ON customers.id = customer_id
+        JOIN items ON items.product = s.product
+        WHERE valid_from <= CURRENT_TIMESTAMP
+            AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
+            AND (NOT members_only OR member_since IS NOT NULL)
+            AND (expected_offers IS NULL OR s.id = ANY(expected_offers))
+        ORDER BY s.id
+        FOR NO KEY UPDATE OF s
+    )
+    SELECT id, product, new_price, quantity1, quantity2,
+        CASE
+            WHEN limit_per_customer IS NULL THEN NULL
+            ELSE GREATEST(limit_per_customer - COALESCE(sou.previous_uses, 0), 0)
+        END AS remaining_uses
+    FROM eligible_offers
+    LEFT JOIN LATERAL (
+        -- `special_offer_uses` must have a row to lock to prevent another call from
+        -- double-counting.
+        WITH insert_zeros AS (
+            INSERT INTO special_offer_uses (special_offer, customer, number)
+            VALUES (id, customer_id, 0)
+            ON CONFLICT (special_offer, customer) DO NOTHING
+        )
+        SELECT number
+        FROM special_offer_uses
+        WHERE special_offer = eligible_offers.id AND customer = customer_id
+        FOR NO KEY UPDATE
+    ) sou ON TRUE;
+    -- Consider better error reporting and ignoring duplicates instead of failing.
+    IF expected_offers IS NOT NULL THEN
+        GET DIAGNOSTICS found_offers := ROW_COUNT;
+        IF found_offers < CARDINALITY(expected_offers) THEN
+            RAISE EXCEPTION 'One or more expected special offers was a duplicate, does not exist, is not active, is for a product not in the cart, or the customer is not eligible for it.';
+        END IF;
     END IF;
 
     -- Fails on negative stock.
@@ -1004,28 +1045,18 @@ BEGIN
 
     CREATE TEMP TABLE results
     ON COMMIT DROP AS
-    SELECT i.product, number, amount_per_unit, measurement_unit, price, uses, a.id AS special_offer_id
+    SELECT i.product, i.number, p.amount_per_unit, p.measurement_unit, c.price, c.uses, a.id AS special_offer_id
     FROM items i
-    JOIN products ON products.id = i.product
-    JOIN applied a ON a.product = i.product
-    CROSS JOIN LATERAL calculate_price(
-        price,
-        number,
-        new_price,
-        quantity1,
-        quantity2,
-        CASE
-            WHEN members_only AND member_since IS NULL THEN 0
-            ELSE GREATEST(limit_per_customer - COALESCE(u.number, 0), 0)
-        END
-    ) AS calc;
+    JOIN products p ON p.id = i.product
+    LEFT JOIN applied a ON a.product = i.product
+    CROSS JOIN LATERAL calculate_price(p.price, i.number, a.new_price, a.quantity1, a.quantity2, a.remaining_uses) AS c;
 
     INSERT INTO special_offer_uses (special_offer, customer, number)
     SELECT special_offer_id, customer_id, uses
     FROM results
     WHERE special_offer_id IS NOT NULL AND uses > 0
     ON CONFLICT (special_offer, customer) DO UPDATE
-    SET uses = uses + EXCLUDED.uses;
+    SET number = number + EXCLUDED.number;
 
     INSERT INTO orders (customer, product, number, paid, special_offer_used, amount_per_unit, measurement_unit)
     SELECT customer_id, product, number, price, uses > 0, amount_per_unit, measurement_unit
