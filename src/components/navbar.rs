@@ -1,15 +1,20 @@
 use crate::Route;
 use crate::database::Category as CategoryMarker;
 use crate::database::categories::category_trees;
+use crate::database::Id;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
 /// Props for sidebar category item.
 #[derive(Props, Clone, PartialEq)]
 struct SidebarCategoryProps {
+    /// Category title.
     title: Box<str>,
-    id: crate::database::Id<CategoryMarker>,
-    subcategories: Vec<(crate::database::Id<CategoryMarker>, Box<str>)>,
+    /// Category ID.
+    id: Id<CategoryMarker>,
+    /// Subcategories as (id, name) pairs.
+    subcategories: Vec<(Id<CategoryMarker>, Box<str>)>,
+    /// Called when user navigates.
     on_navigate: EventHandler<()>,
 }
 
