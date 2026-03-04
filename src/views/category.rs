@@ -173,8 +173,7 @@ fn CategorySection(props: CategorySectionProps) -> Element {
                                     }
                                 }
 
-
-
+                
                                 div { class: "overflow-hidden",
                                     div {
                                         class: "flex transition-transform duration-700 ease-in-out",
