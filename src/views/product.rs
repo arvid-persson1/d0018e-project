@@ -56,18 +56,26 @@ pub fn ProductPage(id: Id<Product>) -> Element {
 
             // Bild
 
+            // Info
 
-                            // Info
+            // Varukorg + favorit knappar
 
-                            // Varukorg + favorit knappar
+            // Liknande produkter
 
-                            // Liknande produkter
+            // Recensioner
 
-                            // Recensioner
+            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
 
-                            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
+            // TODO(db): Ersätt med product_reviews() från databasen
 
-                            // TODO(db): Ersätt med product_reviews() från databasen
+
+
+
+
+
+
+
+
                             div { class: "flex flex-col items-center",
                                 div { class: "bg-gray-50 rounded-xl p-8 w-full flex justify-center",
                                     if let Some(img) = product.gallery.first() {
