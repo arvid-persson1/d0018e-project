@@ -7,6 +7,7 @@ use dioxus::prelude::*;
 /// Product page
 /// # Arguments
 /// * `id` - The product ID to display.
+#[allow(clippy::same_name_method, reason = "Dioxus macro limitation")]
 #[component]
 pub fn ProductPage(id: Id<Product>) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();

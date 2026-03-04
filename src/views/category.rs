@@ -87,6 +87,7 @@ pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
 }
 
 /// Props for a single category section
+#[allow(clippy::same_name_method, reason = "Dioxus macro limitation")]
 #[derive(Props, Clone, PartialEq)]
 struct CategorySectionProps {
     /// Category ID

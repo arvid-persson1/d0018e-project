@@ -5,7 +5,11 @@ use dioxus::prelude::*;
 use rust_decimal::Decimal;
 
 // class for a product card
-#[allow(missing_docs, reason = "Props struct, docs on fields below")]
+#[allow(
+    missing_docs,
+    clippy::same_name_method,
+    reason = "Dioxus Props macro limitation"
+)]
 #[derive(Props, Debug, Clone, PartialEq, Eq)]
 
 /// props for productCard
