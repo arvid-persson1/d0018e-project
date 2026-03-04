@@ -8,8 +8,9 @@ use dioxus::prelude::*;
 // A page for categorys
 /// * `id` - Category to display.
 #[allow(
+    clippy::same_name_method,
     clippy::option_if_let_else,
-    reason = "rsx! macro incompatible with map_or_else"
+    reason = "Dioxus macro limitation"
 )]
 #[component]
 pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
