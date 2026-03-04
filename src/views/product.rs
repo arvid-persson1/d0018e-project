@@ -4,12 +4,14 @@ use crate::database::{Id, Product};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
+/// product page.
+
 #[component]
 pub fn ProductPage(id: Id<Product>) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
     let nav = use_navigator();
-    let mut text_val = use_signal(|| String::new());
-    let mut selected_rating = use_signal(|| 0u8);
+    let mut text_val = use_signal(String::new);
+    let mut selected_rating = use_signal(|| 0_u8);
     let max_chars = 300;
 
     // TODO(db): Skicka med inloggad kunds ID när login finns: Some(customer_id)
@@ -54,25 +56,18 @@ pub fn ProductPage(id: Id<Product>) -> Element {
 
             // Bild
 
-            // Info
 
-            // Varukorg + favorit knappar
+                            // Info
 
-            // Liknande produkter
+                            // Varukorg + favorit knappar
 
-            // Recensioner
+                            // Liknande produkter
 
-            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
+                            // Recensioner
 
-            // TODO(db): Ersätt med product_reviews() från databasen
+                            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
 
-
-
-
-
-
-
-
+                            // TODO(db): Ersätt med product_reviews() från databasen
                             div { class: "flex flex-col items-center",
                                 div { class: "bg-gray-50 rounded-xl p-8 w-full flex justify-center",
                                     if let Some(img) = product.gallery.first() {
@@ -84,7 +79,7 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                                 }
                                 div { class: "mt-6 flex flex-col items-center gap-2",
                                     div { class: "flex text-yellow-400 text-xl",
-                                        for i in 0..5usize {
+                                        for i in 0..5_usize {
                                             if i < full_stars {
                                                 i { class: "fa-solid fa-star" }
                                             } else {
@@ -156,7 +151,7 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                                 h3 { class: "font-bold text-lg mb-4 text-green-900", "Skriv en recension" }
 
                                 div { class: "flex gap-2 mb-4",
-                                    for n in 1u8..=5 {
+                                    for n in 1_u8..=5 {
                                         i {
                                             class: if selected_rating() >= n { "fa-solid fa-star text-2xl cursor-pointer text-yellow-400" } else { "fa-solid fa-star text-2xl cursor-pointer text-gray-300" },
                                             onclick: move |_| selected_rating.set(n),

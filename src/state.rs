@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 use std::num::NonZeroU32;
 
 /// Global state shared across the app.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GlobalState {
     /// Cart items: product ID
     pub cart_items: HashMap<Id<Product>, NonZeroU32>,
@@ -15,7 +15,7 @@ pub struct GlobalState {
 
 impl GlobalState {
     /// Get the total number of items in the cart
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Will be used when cart page is implemented")]
     pub fn cart_total(&self) -> u32 {
         self.cart_items.values().map(|n| n.get()).sum()
     }
@@ -26,16 +26,20 @@ impl GlobalState {
         self.cart_items.get(&id).map_or(0, |n| n.get())
     }
 
+    /// # Panics
+    /// Never panics in practice.
     /// Add one unit of a product to the cart
     pub fn add_to_cart(&mut self, id: Id<Product>) {
         use std::num::NonZero;
         let entry = self
             .cart_items
             .entry(id)
-            .or_insert(NonZero::new(1).unwrap());
+            .or_insert(NonZero::new(1).expect("1 is non-zero"));
         *entry = NonZero::new(entry.get() + 1).unwrap_or(*entry);
     }
 
+    /// # Panics  
+    /// Never panics in practice.
     /// Remove one unit of a product from the cart
     /// Removes if count reaches 0
     pub fn remove_from_cart(&mut self, id: Id<Product>) {
@@ -44,7 +48,7 @@ impl GlobalState {
             if count.get() <= 1 {
                 let _ = self.cart_items.remove(&id);
             } else {
-                *count = NonZero::new(count.get() - 1).unwrap();
+                *count = NonZero::new(count.get() - 1).expect("count - 1 is non-zero");
             }
         }
     }

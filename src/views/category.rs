@@ -96,7 +96,7 @@ struct CategorySectionProps {
 fn CategorySection(props: CategorySectionProps) -> Element {
     let cat_id = props.cat_id;
     let show_all = props.show_all;
-    let mut pos = use_signal(|| 0usize);
+    let mut pos = use_signal(|| 0_usize);
 
     let products = use_resource(move || async move {
         products_by_category(None, cat_id, None, if show_all { 50 } else { 12 }, 0)

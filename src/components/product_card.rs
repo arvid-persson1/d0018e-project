@@ -5,8 +5,8 @@ use dioxus::prelude::*;
 use rust_decimal::Decimal;
 
 // class for a product card
-#[allow(missing_docs)]
-#[derive(Props, Debug, Clone, PartialEq)]
+#[allow(missing_docs, reason = "Props struct, docs on fields below")]
+#[derive(Props, Debug, Clone, PartialEq, Eq)]
 
 /// props for productCard
 pub struct ProductCardProps {
