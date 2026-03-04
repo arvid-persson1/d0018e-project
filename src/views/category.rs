@@ -6,7 +6,11 @@ use crate::database::{Category as CategoryMarker, Id};
 use dioxus::prelude::*;
 
 // A page for categorys
-
+/// * `id` - Category to display.
+#[allow(
+    clippy::option_if_let_else,
+    reason = "rsx! macro incompatible with map_or_else"
+)]
 #[component]
 pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
     // Hämta kategorier från databasen

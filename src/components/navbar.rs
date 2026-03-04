@@ -6,6 +6,12 @@ use crate::state::GlobalState;
 use dioxus::prelude::*;
 
 /// Props for sidebar category item.
+#[allow(
+    clippy::option_if_let_else,
+    clippy::ignored_unit_patterns,
+    clippy::same_name_method,
+    reason = "Dioxus macro limitations"
+)]
 #[derive(Props, Clone, PartialEq)]
 struct SidebarCategoryProps {
     /// Category title.

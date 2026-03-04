@@ -4,6 +4,10 @@ use crate::database::products::newest_products;
 use dioxus::prelude::*;
 
 /// Home page..
+#[allow(
+    clippy::option_if_let_else,
+    reason = "rsx! macro incompatible with map_or_else"
+)]
 #[component]
 pub fn Home() -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop

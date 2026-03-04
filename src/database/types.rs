@@ -440,6 +440,7 @@ impl Deal {
     /// Specifically, this returns a tuple representing the columns  `new_price`, `quantity1` and
     /// `quantity2` respectively on success. If either quantity is greater than `i32::MAX`, `None`
     /// is returned.
+    #[allow(clippy::option_if_let_else, reason = "match arm clarity")]
     #[must_use]
     pub fn database_repr(self) -> Option<(Option<Decimal>, Option<i32>, Option<i32>)> {
         let Self(deal) = self;
