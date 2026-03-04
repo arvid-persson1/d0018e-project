@@ -430,6 +430,7 @@ pub async fn product_reviews(
     clippy::missing_panics_doc,
     reason = "Database validation and correctness checks only."
 )]
+#[allow(clippy::too_many_lines, reason = "Complex query function")]
 pub async fn product_reviews_as(
     customer: Id<Customer>,
     product: Id<Product>,

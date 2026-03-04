@@ -71,6 +71,8 @@ fn App() -> Element {
     }
 }
 
+/// # Panics
+/// Panics if `DATABASE_URL` environment variable is not set.
 fn main() {
     #[cfg(feature = "server")]
     {

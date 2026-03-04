@@ -34,6 +34,8 @@ pub type Counts = HashMap<Id<Product>, NonZeroU32>;
 /// Fails if:
 /// - `customer` is invalid.
 /// - An error occurs during communication with the database.
+/// # Panics
+/// Panics if the database returns a non-positive number.
 #[server]
 pub async fn cart_counts(customer: Id<Customer>) -> Result<HashMap<Id<Product>, NonZeroU32>> {
     query_as!(
