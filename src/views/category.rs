@@ -173,11 +173,13 @@ fn CategorySection(props: CategorySectionProps) -> Element {
                                     }
                                 }
 
-
-
-
-
-
+                
+                
+                
+                
+                
+                
+                
 
                                 div { class: "overflow-hidden",
                                     div {
@@ -204,7 +206,7 @@ fn CategorySection(props: CategorySectionProps) -> Element {
                                         }
                                     }
                                 }
-
+                
                                 if current_pos < max_steps - 1 && total > 4 {
                                     button {
                                         class: "absolute -right-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
@@ -212,7 +214,7 @@ fn CategorySection(props: CategorySectionProps) -> Element {
                                         i { class: "fa-solid fa-chevron-right text-lg" }
                                     }
                                 }
-
+                
                                 if total > 4 {
                                     div { class: "flex justify-center items-center gap-3 mt-8",
                                         for i in 0..max_steps {
