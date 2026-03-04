@@ -62,7 +62,7 @@ pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
                     h1 { class: "text-4xl font-black mb-8 text-gray-900", "Kategorier" }
                 }
 
-                                    // Slider
+                // Slider
                 match &*categories_resource.read() {
                     None => rsx! {
                         p { class: "text-gray-400 py-20 text-center", "Laddar kategorier..." }
@@ -165,6 +165,8 @@ fn CategorySection(props: CategorySectionProps) -> Element {
                                         i { class: "fa-solid fa-chevron-left text-lg" }
                                     }
                                 }
+
+
 
                                 div { class: "overflow-hidden",
                                     div {

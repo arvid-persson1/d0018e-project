@@ -155,9 +155,7 @@ pub fn Navbar() -> Element {
                                         SidebarCategory {
                                             title: tree.name.clone(),
                                             id: tree.id,
-                                            subcategories: tree.subcategories.iter()
-                                                                                                                                                                                                                                                                                                                        .map(|s| (s.id, s.name.clone()))
-                                                                                                                                                                                                                                                                                                                        .collect(),
+                                            subcategories: tree.subcategories.iter().map(|s| (s.id, s.name.clone())).collect(),
                                             on_navigate: move |_| show_sidebar.set(false),
                                         }
                                     }

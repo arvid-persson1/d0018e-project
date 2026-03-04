@@ -49,7 +49,20 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                         // Produkt info
                         div { class: "grid grid-cols-1 md:grid-cols-2 gap-12 mb-16",
 
-                            // Bild
+            // Bild
+
+
+                            // Info
+
+                            // Varukorg + favorit knappar
+
+                            // Liknande produkter
+
+                            // Recensioner
+
+                            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
+
+                            // TODO(db): Ersätt med product_reviews() från databasen
                             div { class: "flex flex-col items-center",
                                 div { class: "bg-gray-50 rounded-xl p-8 w-full flex justify-center",
                                     if let Some(img) = product.gallery.first() {
@@ -75,7 +88,6 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                                 }
                             }
 
-                            // Info
                             div { class: "flex flex-col justify-start",
                                 h1 { class: "text-4xl font-black text-gray-900 mb-2", "{product.name}" }
                                 p { class: "text-gray-500 text-lg mb-4", "{product.description}" }
@@ -85,7 +97,6 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                                     div { class: "text-gray-500 font-bold", "Säljs av {product.vendor_name}" }
                                 }
 
-                                // Varukorg + favorit knappar
                                 div { class: "flex gap-4 items-center h-16",
                                     if count == 0 {
                                         button {
@@ -123,13 +134,11 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                             }
                         }
 
-                        // Liknande produkter
                         div { class: "border-t pt-16 mb-16",
                             h2 { class: "text-3xl font-black mb-8 text-gray-900", "Liknande produkter" }
                             p { class: "text-gray-400", "Laddas när databasen är kopplad." }
                         }
 
-                        // Recensioner
                         div { class: "max-w-3xl",
                             h2 { class: "text-2xl font-black mb-8", "Vad tycker andra kunder?" }
 
@@ -157,7 +166,6 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                                     span { class: "text-sm text-gray-500", "{text_val().len()} / {max_chars} tecken" }
                                 }
 
-                                // TODO(db): Anropa create_review() med produkt-ID och kund-ID
                                 button {
                                     class: "bg-green-700 text-white px-8 py-3 rounded-full font-bold hover:bg-green-800 transition shadow-sm disabled:opacity-30 disabled:cursor-not-allowed",
                                     disabled: selected_rating() == 0,
@@ -165,7 +173,6 @@ pub fn ProductPage(id: Id<Product>) -> Element {
                                 }
                             }
 
-                            // TODO(db): Ersätt med product_reviews() från databasen
                             div { class: "space-y-6",
                                 div { class: "border-b pb-6",
                                     div { class: "flex gap-1 mb-2",
