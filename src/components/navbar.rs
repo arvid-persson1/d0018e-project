@@ -63,6 +63,11 @@ fn SidebarCategory(props: SidebarCategoryProps) -> Element {
 }
 
 /// Navbar
+#[allow(
+    clippy::option_if_let_else,
+    clippy::ignored_unit_patterns,
+    reason = "rsx! macro limitation"
+)]
 #[component]
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
