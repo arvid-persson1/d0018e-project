@@ -1,26 +1,20 @@
 use crate::Route;
 use crate::components::ProductCard;
-use crate::fake_data::get_fake_products;
-use crate::{Category, Id};
+use crate::database::categories::category_trees;
+use crate::database::products::products_by_category;
+use crate::database::{Category as CategoryMarker, Id};
 use dioxus::prelude::*;
 
+// A page for categorys
+
 #[component]
-pub fn CategoryPage(id: Id<Category>) -> Element {
-    // TODO(db): Ersätt get_fake_products() med ett API-anrop eller databas-query
-    let products = get_fake_products();
+pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
+    // Hämta kategorier från databasen
+    let categories_resource = use_resource(|| async move {
+        category_trees().await.unwrap_or_default()
+    });
 
-    let scroll_pos_1 = use_signal(|| 0);
-    let scroll_pos_2 = use_signal(|| 0);
-    let scroll_pos_3 = use_signal(|| 0);
-    let scroll_pos_4 = use_signal(|| 0);
-
-    // TODO(db): Ersätt hårdkodad lista med hämtade kategorier från API
-    let categories = vec![
-        (1, "Mejeri & Ägg", scroll_pos_1),
-        (2, "Frukt & Grönt", scroll_pos_2),
-        (3, "Kött & Chark", scroll_pos_3),
-        (4, "Skafferi", scroll_pos_4),
-    ];
+    
 
     rsx! {
         div { class: "container mx-auto p-6 flex flex-col md:flex-row gap-8 min-h-screen",
@@ -36,12 +30,27 @@ pub fn CategoryPage(id: Id<Category>) -> Element {
                             class: if id == 0.into() { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
                             "Visa alla kategorier"
                         }
-                        for (cat_id , name , _pos) in categories.clone() {
-                            Link {
-                                to: Route::Category { id: cat_id.into() },
-                                class: if id == cat_id.into() { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
-                                "{name}"
-                            }
+
+                        match &*categories_resource.read() {
+                            None => rsx! {
+                                p { class: "text-gray-400 text-sm", "Laddar..." }
+                            },
+                            Some(trees) => rsx! {
+                                for tree in trees.iter() {
+                                    Link {
+                                        to: Route::Category { id: tree.id },
+                                        class: if id == tree.id { "text-green-700 font-bold" } else { "text-gray-600 hover:text-green-700" },
+                                        "{tree.name}"
+                                    }
+                                    for sub in tree.subcategories.iter() {
+                                        Link {
+                                            to: Route::Category { id: sub.id },
+                                            class: if id == sub.id { "text-green-700 font-bold pl-4" } else { "text-gray-400 hover:text-green-700 pl-4 text-sm" },
+                                            "— {sub.name}"
+                                        }
+                                    }
+                                }
+                            },
                         }
                     }
                 }
@@ -53,140 +62,150 @@ pub fn CategoryPage(id: Id<Category>) -> Element {
                     h1 { class: "text-4xl font-black mb-8 text-gray-900", "Kategorier" }
                 }
 
-                // räkna ut steg för scrollning
-                for (cat_id , cat_name , mut pos) in categories {
-                    if id == 0.into() || id == cat_id.into() {
-                        {
-                            let current_pos = *pos.read();
-                            let offset = current_pos * 100;
-                            // TODO(db): Ersätt med en query som hämtar produkter filtrerade per category_id
-                            let cat_products: Vec<_> = products
-                                .iter()
-                                .filter(|p| p.category_id == cat_id)
-                                .collect();
-                            // Antal produkter, max 12 st
-                            let total_cards = cat_products.iter().take(12).count();
-                            // Antal sidor i slider, visar 4 produkter
-                            let max_steps = if total_cards > 4 { total_cards.div_ceil(4) } else { 1 };
-                            rsx! {
-                                div { class: "mb-20",
-                                    div { class: "flex justify-between items-center mb-6",
-                                        // Kategorinamn
-                                        h2 { class: "text-2xl font-bold flex items-center gap-2",
-                                            span { class: "w-2 h-8 bg-green-700 rounded-full block" }
-                                            "{cat_name}"
-                                        }
-                                        // Visa allt knapp
-                                        Link {
-                                            to: Route::Category { id: cat_id.into() },
-                                            class: "flex items-center gap-2 text-green-700 font-bold hover:text-green-800 transition-colors bg-green-50 px-4 py-2 rounded-full text-sm",
-                                            "Visa alla {cat_name}"
-                                            i { class: "fa-solid fa-chevron-right text-xs" }
-                                        }
-                                    }
-
-
                                     // Slider
+                match &*categories_resource.read() {
+                    None => rsx! {
+                        p { class: "text-gray-400 py-20 text-center", "Laddar kategorier..." }
+                    },
+                    Some(trees) => rsx! {
+                        for (i , tree) in trees.iter().enumerate() {
+                            if id == 0.into() || id == tree.id {
+                                CategorySection {
+                                    cat_id: tree.id,
+                                    cat_name: tree.name.clone(),
+                                    show_all: id != 0.into(),
+                                    scroll_index: i,
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        }
+    }
+}
 
-                                    // Vänster pil
-                                    // har mer än 4 produkter
+/// Props for a single category section
+#[derive(Props, Clone, PartialEq)]
+struct CategorySectionProps {
+    cat_id: Id<CategoryMarker>,
+    cat_name: Box<str>,
+    show_all: bool,
+    scroll_index: usize,
+}
 
-                                    // Produktslider
+/// A section showing products for one category
+#[component]
+fn CategorySection(props: CategorySectionProps) -> Element {
+    let cat_id = props.cat_id;
+    let show_all = props.show_all;
+    let mut pos = use_signal(|| 0usize);
 
-                                    // loopa maxsteg
-                                    // TODO(db): ProductCard är samma, bara datan ändras
+    let products = use_resource(move || async move {
+        products_by_category(None, cat_id, None, if show_all { 50 } else { 12 }, 0)
+            .await
+            .unwrap_or_default()
+    });
 
-                                    // etikett i slutet av scrollning
-                                    // Tom kategori
-                                    // "Visa hela" kort i slutet
+    let current_pos = *pos.read();
 
-                                    // Höger pil
-                                    // har mer än 4 produkter
+    rsx! {
+        div { class: "mb-20",
+            div { class: "flex justify-between items-center mb-6",
+                h2 { class: "text-2xl font-bold flex items-center gap-2",
+                    span { class: "w-2 h-8 bg-green-700 rounded-full block" }
+                    "{props.cat_name}"
+                }
+                if !show_all {
+                    Link {
+                        to: Route::Category { id: cat_id },
+                        class: "flex items-center gap-2 text-green-700 font-bold hover:text-green-800 transition-colors bg-green-50 px-4 py-2 rounded-full text-sm",
+                        "Visa alla {props.cat_name}"
+                        i { class: "fa-solid fa-chevron-right text-xs" }
+                    }
+                }
+            }
 
-                                    // Dot-indikator
-                                    // Grid-läge på enskild kategori
-                                    // TODO(db): ProductCard är samma, bara datan ändras
-                                    if id == 0.into() {
-                                        div { class: "relative group",
+            match &*products.read() {
+                None => rsx! {
+                    p { class: "text-gray-400", "Laddar produkter..." }
+                },
+                Some(items) if items.is_empty() => rsx! {
+                    div { class: "h-48 flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200",
+                        i { class: "fa-solid fa-box-open text-4xl text-gray-400 mb-3" }
+                        p { class: "font-bold text-gray-500", "Denna kategori är tom" }
+                    }
+                },
+                Some(items) => {
+                    let total = items.len();
+                    let max_steps = if total > 4 { total.div_ceil(4) } else { 1 };
+                    let offset = current_pos * 100;
 
-                                            if current_pos > 0 && total_cards > 4 {
-                                                button {
-                                                    class: "absolute -left-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
-                                                    onclick: move |_| pos.set(current_pos - 1),
-                                                    i { class: "fa-solid fa-chevron-left text-lg" }
-                                                }
-                                            }
+                    if show_all {
+                        rsx! {
+                            div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
+                                for p in items.iter() {
+                                    ProductCard {
+                                        id: p.id,
+                                        name: p.name.clone(),
+                                        price: p.price,
+                                        comparison_price: p.amount_per_unit.to_string().into(),
+                                        image_url: p.thumbnail.clone(),
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        rsx! {
+                            div { class: "relative group",
+                                if current_pos > 0 && total > 4 {
+                                    button {
+                                        class: "absolute -left-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
+                                        onclick: move |_| pos.set(current_pos - 1),
+                                        i { class: "fa-solid fa-chevron-left text-lg" }
+                                    }
+                                }
 
-                                            div { class: "overflow-hidden",
-                                                div {
-                                                    class: "flex transition-transform duration-700 ease-in-out",
-                                                    style: "transform: translateX(-{offset}%);",
-
-                                                    for p in cat_products.iter().take(11) {
-                                                        div { class: "min-w-full md:min-w-[25%] p-2",
-                                                            ProductCard {
-                                                                id: p.id,
-                                                                name: p.name.clone(),
-                                                                price: p.price,
-                                                                comparison_price: p.comparison_price.clone(),
-                                                                image_url: p.image_url.clone(),
-                                                            }
-                                                        }
-                                                    }
-
-                                                    if total_cards == 0 {
-                                                        div { class: "min-w-full md:min-w-[25%] p-2",
-                                                            div { class: "h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 min-h-[380px]",
-                                                                div { class: "text-center p-4",
-                                                                    i { class: "fa-solid fa-box-open text-4xl text-gray-400 mb-3" }
-                                                                    p { class: "font-bold text-gray-500", "Denna kategori är tom" }
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        div { class: "min-w-full md:min-w-[25%] p-2",
-                                                            Link { to: Route::Category { id: cat_id.into() },
-                                                                div { class: "h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:bg-green-100 transition-all min-h-[380px]",
-                                                                    div { class: "text-center p-4",
-                                                                        i { class: "fa-solid fa-arrow-right-long text-4xl text-green-700 mb-3" }
-                                                                        p { class: "font-bold text-gray-800", "Visa hela sortimentet" }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            if current_pos < max_steps - 1 && total_cards > 4 {
-                                                button {
-                                                    class: "absolute -right-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
-                                                    onclick: move |_| pos.set(current_pos + 1),
-                                                    i { class: "fa-solid fa-chevron-right text-lg" }
-                                                }
-                                            }
-
-                                            if total_cards > 4 {
-                                                div { class: "flex justify-center items-center gap-3 mt-8",
-                                                    for i in 0..max_steps {
-                                                        button {
-                                                            class: if current_pos == i { "w-10 h-2 rounded-full bg-green-700 transition-all" } else { "w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-400" },
-                                                            onclick: move |_| pos.set(i),
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
-                                            for p in cat_products {
+                                div { class: "overflow-hidden",
+                                    div {
+                                        class: "flex transition-transform duration-700 ease-in-out",
+                                        style: "transform: translateX(-{offset}%);",
+                                        for p in items.iter().take(11) {
+                                            div { class: "min-w-full md:min-w-[25%] p-2",
                                                 ProductCard {
                                                     id: p.id,
                                                     name: p.name.clone(),
                                                     price: p.price,
-                                                    comparison_price: p.comparison_price.clone(),
-                                                    image_url: p.image_url.clone(),
+                                                    comparison_price: p.amount_per_unit.to_string().into(),
+                                                    image_url: p.thumbnail.clone(),
                                                 }
+                                            }
+                                        }
+                                        div { class: "min-w-full md:min-w-[25%] p-2",
+                                            Link { to: Route::Category { id: cat_id },
+                                                div { class: "h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:bg-green-100 transition-all min-h-[380px]",
+                                                    i { class: "fa-solid fa-arrow-right-long text-4xl text-green-700 mb-3" }
+                                                    p { class: "font-bold text-gray-800", "Visa hela sortimentet" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if current_pos < max_steps - 1 && total > 4 {
+                                    button {
+                                        class: "absolute -right-5 top-1/2 -translate-y-1/2 w-12 h-12 bg-white shadow-2xl border rounded-full flex items-center justify-center hover:bg-green-700 hover:text-white transition-all z-30",
+                                        onclick: move |_| pos.set(current_pos + 1),
+                                        i { class: "fa-solid fa-chevron-right text-lg" }
+                                    }
+                                }
+
+                                if total > 4 {
+                                    div { class: "flex justify-center items-center gap-3 mt-8",
+                                        for i in 0..max_steps {
+                                            button {
+                                                class: if current_pos == i { "w-10 h-2 rounded-full bg-green-700 transition-all" } else { "w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-400" },
+                                                onclick: move |_| pos.set(i),
                                             }
                                         }
                                     }

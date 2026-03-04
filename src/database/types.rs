@@ -445,16 +445,18 @@ impl Deal {
         let Self(deal) = self;
         match deal {
             DealImpl::Discount { new_price } => Some((Some(new_price), None, None)),
-            DealImpl::Batch { take, pay_for }
-                if let Ok(take) = take.get().try_into()
-                    && let Ok(pay_for) = pay_for.get().try_into() =>
-            {
-                Some((None, Some(take), Some(pay_for)))
+            DealImpl::Batch { take, pay_for } => {
+                match (take.get().try_into(), pay_for.get().try_into()) {
+                    (Ok(take), Ok(pay_for)) => Some((None, Some(take), Some(pay_for))),
+                    _ => None,
+                }
             },
-            DealImpl::BatchPrice { take, pay } if let Ok(take) = take.get().try_into() => {
-                Some((Some(pay), Some(take), None))
+            DealImpl::BatchPrice { take, pay } => {
+                match take.get().try_into() {
+                    Ok(take) => Some((Some(pay), Some(take), None)),
+                    _ => None,
+                }
             },
-            DealImpl::Batch { .. } | DealImpl::BatchPrice { .. } => None,
         }
     }
 

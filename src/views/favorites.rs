@@ -1,6 +1,4 @@
 use crate::Route;
-use crate::components::ProductCard;
-use crate::fake_data::get_fake_products;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
@@ -8,20 +6,15 @@ use dioxus::prelude::*;
 #[component]
 pub fn FavoritesPage() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
-    // TODO(db): Ersätt get_fake_products() med ett API-anrop
-    let products = get_fake_products();
 
-    // Filtrera data, de tillagda i favriter är de som syns!
-    // TODO(db): Favorit-ID:n ska sparas i databasen per användare istället för GlobalState
-    let fav_items: Vec<_> = products
-        .into_iter()
-        .filter(|p| global_state.read().favorites.contains(&p.id))
-        .collect();
+    // TODO(db): När inloggning finns, använd inloggad kunds ID istället för None
+    // Just nu visas favoriter från GlobalState eftersom vi inte har login än
+
+    // TODO(db): Byt ut detta mot favorites(customer_id, 50, 0) när login finns
+    
 
     rsx! {
         div { class: "container mx-auto p-8",
-
-            // Knapp för att gå tillbaka till main page
             Link {
                 to: Route::Home {},
                 class: "text-green-700 hover:text-green-900 font-bold flex items-center gap-2 mb-4 transition-colors",
@@ -30,25 +23,17 @@ pub fn FavoritesPage() -> Element {
             }
             h1 { class: "text-3xl font-black mb-8", "Mina Favoriter" }
 
-            if fav_items.is_empty() {
+            if global_state.read().favorites.is_empty() {
                 div { class: "text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100",
                     i { class: "fa-regular fa-heart text-6xl text-gray-200 mb-4" }
                     p { class: "text-gray-500 text-xl", "Du har inga sparade produkter här!" }
                 }
             } else {
-                div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6",
-                    for p in fav_items {
-                        // TODO(db): ProductCard är samma, bara datan ändras
-                        ProductCard {
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            image_url: p.image_url,
-                            comparison_price: p.comparison_price,
-                        }
-                    }
-                }
+                // TODO(db): När login finns, ersätt med use_resource som kallar favorites(customer_id, 50, 0)
+                // och loopa över ProductOverviewFavorited istället
+                p { class: "text-gray-500", "Dina favoriter visas här när databasen är kopplad." }
             }
         }
     }
 }
+    

@@ -8,7 +8,6 @@ use components::Navbar;
 pub mod database;
 pub mod views;
 use database::{Category, Id, Product, Vendor};
-mod fake_data;
 mod state;
 
 use dioxus::prelude::*;
@@ -62,7 +61,6 @@ fn App() -> Element {
         //     rel: "stylesheet",
         //     href: "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css",
         // }
-
         Router::<Route> {}
     }
 }
