@@ -1,7 +1,7 @@
 use crate::Route;
 use crate::database::Category as CategoryMarker;
-use crate::database::categories::category_trees;
 use crate::database::Id;
+use crate::database::categories::category_trees;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
