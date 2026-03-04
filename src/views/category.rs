@@ -85,9 +85,13 @@ pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
 /// Props for a single category section
 #[derive(Props, Clone, PartialEq)]
 struct CategorySectionProps {
+    /// Category ID
     cat_id: Id<CategoryMarker>,
+    /// Category name
     cat_name: Box<str>,
+    /// Whether to show all products
     show_all: bool,
+    /// Scroll index for animation
     scroll_index: usize,
 }
 

@@ -23,7 +23,7 @@ struct CartCountRepr {
 /// The contents of a customer's shopping cart.
 ///
 /// Does not include deleted or invisible products.
-pub type CartCounts = HashMap<Id<Product>, NonZeroU32>;
+pub type Counts = HashMap<Id<Product>, NonZeroU32>;
 
 /// Get the contents of a customer's cart.
 ///

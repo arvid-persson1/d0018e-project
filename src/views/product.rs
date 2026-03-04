@@ -4,8 +4,9 @@ use crate::database::{Id, Product};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
-/// product page.
-
+/// Product page
+/// # Arguments
+/// * `id` - The product ID to display.
 #[component]
 pub fn ProductPage(id: Id<Product>) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
