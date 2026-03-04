@@ -1,5 +1,10 @@
 //! The entrypoint for the app.
 
+#![allow(
+    clippy::same_name_method,
+    reason = "Dioxus Props macro generates conflicting method names"
+)]
+#![allow(clippy::missing_docs_in_private_items, reason = "Component parameters")]
 #![feature(iter_collect_into)]
 #![cfg_attr(feature = "server", expect(clippy::todo, reason = "TODO"))]
 
