@@ -15,10 +15,13 @@ pub fn ProductPage(id: Id<Product>) -> Element {
     // TODO(db): Skicka med inloggad kunds ID när login finns: Some(customer_id)
     let product_resource = use_resource(move || async move { product_info(None, id).await });
 
-
     let count = global_state.read().cart_count(id);
     let is_favorite = global_state.read().favorites.contains(&id);
-    let heart_class = if is_favorite { "text-red-500" } else { "text-gray-400 hover:text-red-500" };
+    let heart_class = if is_favorite {
+        "text-red-500"
+    } else {
+        "text-gray-400 hover:text-red-500"
+    };
 
     rsx! {
         div { class: "max-w-6xl mx-auto p-4 md:p-8 bg-white",
@@ -51,18 +54,25 @@ pub fn ProductPage(id: Id<Product>) -> Element {
 
             // Bild
 
+            // Info
 
-                            // Info
+            // Varukorg + favorit knappar
 
-                            // Varukorg + favorit knappar
+            // Liknande produkter
 
-                            // Liknande produkter
+            // Recensioner
 
-                            // Recensioner
+            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
 
-                            // TODO(db): Anropa create_review() med produkt-ID och kund-ID
+            // TODO(db): Ersätt med product_reviews() från databasen
 
-                            // TODO(db): Ersätt med product_reviews() från databasen
+
+
+
+
+
+
+
                             div { class: "flex flex-col items-center",
                                 div { class: "bg-gray-50 rounded-xl p-8 w-full flex justify-center",
                                     if let Some(img) = product.gallery.first() {

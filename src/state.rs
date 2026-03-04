@@ -1,8 +1,8 @@
 //use dioxus::prelude::*;
 //! Global application state.
 use crate::database::{Id, Product};
-use std::num::NonZeroU32;
 use hashbrown::HashMap;
+use std::num::NonZeroU32;
 
 /// Global state shared across the app.
 #[derive(Clone, Debug, PartialEq)]
@@ -29,7 +29,10 @@ impl GlobalState {
     /// Add one unit of a product to the cart
     pub fn add_to_cart(&mut self, id: Id<Product>) {
         use std::num::NonZero;
-        let entry = self.cart_items.entry(id).or_insert(NonZero::new(1).unwrap());
+        let entry = self
+            .cart_items
+            .entry(id)
+            .or_insert(NonZero::new(1).unwrap());
         *entry = NonZero::new(entry.get() + 1).unwrap_or(*entry);
     }
 
@@ -55,4 +58,3 @@ impl GlobalState {
         }
     }
 }
-

@@ -1,7 +1,7 @@
 //! Rudimentary authentication.
 
+use crate::database::Id;
 use crate::{
-    Id,
     database::{Administrator, Customer, ProfilePicture, Username, Vendor},
 };
 use dioxus::prelude::*;

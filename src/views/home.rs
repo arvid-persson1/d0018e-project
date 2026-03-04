@@ -8,10 +8,9 @@ use dioxus::prelude::*;
 pub fn Home() -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop
     // TODO(db): Lägg till paginering eller lazy-loading när produktmängd växer
-    let products = use_resource(|| async move {
-        newest_products(None, 20, 0).await.unwrap_or_default()
-    });
-    
+    let products =
+        use_resource(|| async move { newest_products(None, 20, 0).await.unwrap_or_default() });
+
     rsx! {
         div { class: "min-h-screen bg-gray-50",
             main { class: "container mx-auto p-4 py-8",

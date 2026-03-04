@@ -1,9 +1,8 @@
 use crate::Route;
+use crate::database::Category as CategoryMarker;
+use crate::database::categories::category_trees;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
-use crate::database::categories::category_trees;
-use crate::database::Category as CategoryMarker;
-
 
 /// Props for sidebar category item.
 #[derive(Props, Clone, PartialEq)]
@@ -59,12 +58,15 @@ pub fn Navbar() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
 
     let fav_count = global_state.read().favorites.len();
-    let cart_total = global_state.read().cart_items.values().map(|n| n.get()).sum::<u32>();
+    let cart_total = global_state
+        .read()
+        .cart_items
+        .values()
+        .map(|n| n.get())
+        .sum::<u32>();
 
     // Hämta kategorier från databasen för sidebaren
-    let categories = use_resource(|| async move {
-        category_trees().await.unwrap_or_default()
-    });
+    let categories = use_resource(|| async move { category_trees().await.unwrap_or_default() });
 
     rsx! {
         rect {

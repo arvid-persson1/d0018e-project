@@ -5,9 +5,10 @@
 
 pub mod components;
 use components::Navbar;
+use database::Id;
 pub mod database;
 pub mod views;
-use database::{Category, Id, Product, Vendor};
+use database::{Category, Product, Vendor};
 mod state;
 
 use dioxus::prelude::*;

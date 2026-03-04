@@ -10,11 +10,8 @@ use dioxus::prelude::*;
 #[component]
 pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
     // Hämta kategorier från databasen
-    let categories_resource = use_resource(|| async move {
-        category_trees().await.unwrap_or_default()
-    });
-
-    
+    let categories_resource =
+        use_resource(|| async move { category_trees().await.unwrap_or_default() });
 
     rsx! {
         div { class: "container mx-auto p-6 flex flex-col md:flex-row gap-8 min-h-screen",

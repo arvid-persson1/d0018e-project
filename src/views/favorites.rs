@@ -11,7 +11,6 @@ pub fn FavoritesPage() -> Element {
     // Just nu visas favoriter från GlobalState eftersom vi inte har login än
 
     // TODO(db): Byt ut detta mot favorites(customer_id, 50, 0) när login finns
-    
 
     rsx! {
         div { class: "container mx-auto p-8",
@@ -36,4 +35,3 @@ pub fn FavoritesPage() -> Element {
         }
     }
 }
-    

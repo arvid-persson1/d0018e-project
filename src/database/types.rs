@@ -451,11 +451,9 @@ impl Deal {
                     _ => None,
                 }
             },
-            DealImpl::BatchPrice { take, pay } => {
-                match take.get().try_into() {
-                    Ok(take) => Some((Some(pay), Some(take), None)),
-                    _ => None,
-                }
+            DealImpl::BatchPrice { take, pay } => match take.get().try_into() {
+                Ok(take) => Some((Some(pay), Some(take), None)),
+                _ => None,
             },
         }
     }
