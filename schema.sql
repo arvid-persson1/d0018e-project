@@ -965,6 +965,13 @@ BEGIN
 
     CREATE TEMP TABLE items
     ON COMMIT DROP AS
+    WITH to_delete AS (
+        SELECT 1
+        FROM shopping_cart_items
+        WHERE customer = customer_id
+        ORDER BY product
+        FOR KEY UPDATE
+    ),
     WITH deleted AS (
         DELETE FROM shopping_cart_items
         WHERE customer = customer_id
@@ -1063,3 +1070,4 @@ BEGIN
     FROM results;
 END;
 $$;
+
