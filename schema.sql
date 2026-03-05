@@ -970,7 +970,7 @@ BEGIN
         FROM shopping_cart_items
         WHERE customer = customer_id
         ORDER BY product
-        FOR KEY UPDATE
+        FOR UPDATE
     ),
     WITH deleted AS (
         DELETE FROM shopping_cart_items
@@ -988,7 +988,7 @@ BEGIN
     FROM products p
     JOIN items ON items.product = p.id
     ORDER BY p.id
-    FOR NO KEY UPDATE;
+    FOR SHARE;
 
     IF EXISTS (
         SELECT 1
@@ -1012,7 +1012,7 @@ BEGIN
             AND (NOT members_only OR member_since IS NOT NULL)
             AND (expected_offers IS NULL OR s.id = ANY(expected_offers))
         ORDER BY s.id
-        FOR NO KEY UPDATE OF s
+        FOR KEY SHARE OF s
     )
     SELECT id, product, new_price, quantity1, quantity2,
         CASE
@@ -1070,4 +1070,5 @@ BEGIN
     FROM results;
 END;
 $$;
+
 
