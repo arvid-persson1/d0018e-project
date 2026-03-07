@@ -34,25 +34,21 @@ CREATE DOMAIN RATING AS INT CHECK (VALUE BETWEEN 1 AND 5);
 -- TODO: Improve URL representation or replace entirely (server storage).
 CREATE DOMAIN URL AS TEXT;
 
-CREATE TYPE VOTE AS ENUM ('like', 'dislike');
+-- TODO: Enforce format.
+CREATE DOMAIN PHC_STRING AS TEXT;
 
-CREATE TYPE ROLE AS ENUM ('customer', 'vendor', 'administrator');
+CREATE TYPE VOTE AS ENUM ('like', 'dislike');
 
 CREATE TABLE users (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     username USERNAME UNIQUE NOT NULL,
     email EMAIL UNIQUE NOT NULL,
-    -- Password and other contact information omitted: login information is a security detail,
-    -- contact information is trivial and uninteresting.
+    password_hash PHC_STRING NOT NULL,
 
-    -- NOTE: Currently, no data is deleted from other tables when a user is marked as deleted.
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    -- NOTE: There is no administrators table, since administrators do not need any information
-    -- beyond what any user already has. For example, they share a common profile picture.
-    role ROLE NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- This column can't be automatically generated as it has to be written to by triggers when
-    -- "subclass" is updated.
+    -- role row is updated.
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -72,6 +68,7 @@ CREATE TRIGGER users_creation_time
 BEFORE INSERT OR UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
+-- PERF: Currently (unnecessarily) runs when role row is updated.
 CREATE FUNCTION update_time() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -88,7 +85,7 @@ CREATE TABLE customers (
     id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     profile_picture URL,
     -- Null: not a member.
-    member_since NONFUTURE_TIMESTAMP,
+    member_since NONFUTURE_TIMESTAMP DEFAULT NULL,
     can_review BOOLEAN NOT NULL DEFAULT TRUE
 );
 
@@ -97,6 +94,13 @@ CREATE TABLE vendors (
     profile_picture URL,
     display_name TEXT UNIQUE NOT NULL,
     description TEXT NOT NULL
+);
+
+-- A dummy table makes triggers resistent to schema changes, as otherwise they'd have to rely on
+-- the absence of a row in the other tables as meaning "administrator", which could be confused
+-- with a newly-added role.
+CREATE TABLE administrators (
+    id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE FUNCTION update_time_user_super() RETURNS TRIGGER
@@ -116,136 +120,99 @@ CREATE TRIGGER vendors_update_time_super
 BEFORE UPDATE ON vendors
 FOR EACH ROW EXECUTE FUNCTION update_time_user_super();
 
-CREATE FUNCTION validate_user_subclass() RETURNS TRIGGER
+CREATE TRIGGER administrators_update_time_super
+BEFORE UPDATE ON administrators
+FOR EACH ROW EXECUTE FUNCTION update_time_user_super();
+
+CREATE FUNCTION validate_user_role() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    user_id users.id%TYPE;
 BEGIN
-    CASE NEW.role
-        WHEN 'customer' THEN
-            IF NOT EXISTS (SELECT 1 FROM customers WHERE id = NEW.id) THEN
-                RAISE EXCEPTION 'Customer must have row in customer table.';
-            END IF;
-            IF EXISTS (SELECT 1 FROM vendors WHERE id = NEW.id) THEN
-                RAISE EXCEPTION 'Customer must not have row in vendor table.';
-            END IF;
-        WHEN 'vendor' THEN
-            IF NOT EXISTS (SELECT 1 FROM vendors WHERE id = NEW.id) THEN
-                RAISE EXCEPTION 'Vendor must have row in vendor table.';
-            END IF;
-            IF EXISTS (SELECT 1 FROM customers WHERE id = NEW.id) THEN
-                RAISE EXCEPTION 'Vendor must not have row in customer table.';
-            END IF;
-        WHEN 'administrator' THEN
-            IF EXISTS (SELECT 1 FROM customers WHERE id = NEW.id) THEN
-                RAISE EXCEPTION 'Administrator must not have row in customer table.';
-            END IF;
-            IF EXISTS (SELECT 1 FROM vendors WHERE id = NEW.id) THEN
-                RAISE EXCEPTION 'Administrator must not have row in vendor table.';
-            END IF;
-        ELSE
-            RAISE WARNING 'Unknown role: %.', NEW.role;
-    END CASE;
+    -- `NEW` is null on deletion, but then `OLD` is non-null.
+    user_id := COALESCE(NEW.id, OLD.id);
+    IF
+        EXISTS (SELECT 1 FROM users WHERE id = user_id)
+        AND EXISTS (SELECT 1 FROM customers      WHERE id = user_id)::INT
+          + EXISTS (SELECT 1 FROM vendors        WHERE id = user_id)::INT
+          + EXISTS (SELECT 1 FROM administrators WHERE id = user_id)::INT
+         != 1
+    THEN
+        RAISE EXCEPTION 'User must have exactly one role.';
+    END IF;
 
     RETURN NEW;
 END;
 $$;
 
 CREATE CONSTRAINT TRIGGER users_valid_subclass
-AFTER INSERT OR UPDATE OF role ON users
+AFTER INSERT ON users
 DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION validate_user_subclass();
+FOR EACH ROW EXECUTE FUNCTION validate_user_role();
 
-CREATE FUNCTION validate_user_superclass() RETURNS TRIGGER
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    CASE TG_TABLE_NAME
-        WHEN 'customers'
-        AND NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.id AND role = 'customer') THEN
-            RAISE EXCEPTION 'User is not a customer.';
-        WHEN 'vendors'
-        AND NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.id AND role = 'vendor') THEN
-            RAISE EXCEPTION 'User is not a vendor.';
-    END CASE;
+CREATE CONSTRAINT TRIGGER customers_valid_superclass
+AFTER INSERT OR UPDATE OF id OR DELETE ON customers
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION validate_user_role();
 
-    RETURN NEW;
-END;
+CREATE CONSTRAINT TRIGGER vendors_valid_superclass
+AFTER INSERT OR UPDATE OF id OR DELETE ON vendors
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION validate_user_role();
+
+CREATE CONSTRAINT TRIGGER administrators_valid_superclass
+AFTER INSERT OR UPDATE OF id OR DELETE ON administrators
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION validate_user_role();
+
+CREATE PROCEDURE create_customer(
+    username users.username%TYPE,
+    email users.email%TYPE,
+    password_hash users.password_hash%TYPE,
+    profile_picture customers.profile_picture%TYPE
+) LANGUAGE sql AS $$
+    WITH new_user AS (
+        INSERT INTO users (username, email, password_hash)
+        VALUES (username, email, password_hash)
+        RETURNING id
+    )
+    INSERT INTO customers (id, profile_picture)
+    SELECT id, profile_picture
+    FROM new_user
 $$;
 
-CREATE TRIGGER customers_valid_superclass
-BEFORE INSERT OR UPDATE OF id ON customers
-FOR EACH ROW EXECUTE FUNCTION validate_user_superclass();
-
-CREATE TRIGGER vendors_valid_superclass
-BEFORE INSERT OR UPDATE OF id ON vendors
-FOR EACH ROW EXECUTE FUNCTION validate_user_superclass();
-
-CREATE FUNCTION validate_user_role_change() RETURNS TRIGGER
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    -- `id` is generated and so can't be changed.
-    CASE OLD.role
-        WHEN 'customer' THEN
-            IF EXISTS (SELECT 1 FROM customers WHERE id = OLD.id) THEN
-                RAISE EXCEPTION 'Must remove customer data to change customer role.';
-            END IF;
-        WHEN 'vendor' THEN
-            IF EXISTS (SELECT 1 FROM vendors WHERE id = OLD.id) THEN
-                RAISE EXCEPTION 'Must remove vendor data to change vendor role.';
-            END IF;
-        WHEN 'administrator' THEN
-            NULL;
-        ELSE
-            RAISE WARNING 'Unknown role: %.', NEW.role;
-    END CASE;
-
-    RETURN NEW;
-END;
+CREATE PROCEDURE create_vendor(
+    username users.username%TYPE,
+    email users.email%TYPE,
+    password_hash users.password_hash%TYPE,
+    profile_picture vendors.profile_picture%TYPE,
+    display_name vendors.display_name%TYPE,
+    description vendors.description%TYPE
+) LANGUAGE sql AS $$
+    WITH new_user AS (
+        INSERT INTO users (username, email, password_hash)
+        VALUES (username, email, password_hash)
+        RETURNING id
+    )
+    INSERT INTO vendors (id, profile_picture, display_name, description)
+    SELECT id, profile_picture, display_name, description
+    FROM new_user
 $$;
 
-CREATE TRIGGER users_valid_role_change
-BEFORE UPDATE OF role ON users
-FOR EACH ROW EXECUTE FUNCTION validate_user_role_change();
-
-CREATE FUNCTION validate_user_subclass_deletion() RETURNS TRIGGER
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM users WHERE id = OLD.id) THEN
-        RAISE EXCEPTION 'Must remove user superclass along with subclass.';
-    END IF;
-    RETURN OLD;
-END;
+CREATE PROCEDURE create_administrator(
+    username users.username%TYPE,
+    email users.email%TYPE,
+    password_hash users.password_hash%TYPE
+) LANGUAGE sql AS $$
+    WITH new_user AS (
+        INSERT INTO users (username, email, password_hash)
+        VALUES (username, email, password_hash)
+        RETURNING id
+    )
+    INSERT INTO administrators (id)
+    SELECT id
+    FROM new_user
 $$;
-
-CREATE TRIGGER customers_deletion
-BEFORE DELETE ON customers
-FOR EACH ROW EXECUTE FUNCTION validate_user_subclass_deletion();
-
-CREATE TRIGGER vendors_deletion
-BEFORE DELETE ON vendors
-FOR EACH ROW EXECUTE FUNCTION validate_user_subclass_deletion();
-
-CREATE FUNCTION validate_user_one_subclass() RETURNS TRIGGER
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    CASE TG_TABLE_NAME
-        WHEN 'customers' AND EXISTS (SELECT 1 FROM vendors WHERE id = NEW.id) THEN
-            RAISE EXCEPTION 'User is already a vendor.';
-        WHEN 'vendors' AND EXISTS (SELECT 1 FROM customers WHERE id = NEW.id) THEN
-            RAISE EXCEPTION 'User is already a customer.';
-        ELSE
-            RAISE WARNING 'Unknown role: %.', NEW.role;
-    END CASE;
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER customers_unique_superclass
-BEFORE INSERT OR UPDATE OF id ON customers
-FOR EACH ROW EXECUTE FUNCTION validate_user_one_subclass();
-
-CREATE TRIGGER vendors_unique_superclass
-BEFORE INSERT OR UPDATE OF id ON vendors
-FOR EACH ROW EXECUTE FUNCTION validate_user_one_subclass();
 
 CREATE TABLE categories (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -257,13 +224,19 @@ CREATE INDEX categories_by_parent_name ON categories (parent NULLS FIRST, name);
 
 CREATE TYPE CATEGORY_PATH_SEGMENT AS (id INT, name TEXT);
 CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[]
-LANGUAGE plpgsql STABLE STRICT PARALLEL SAFE AS $$
+LANGUAGE plpgsql STRICT PARALLEL SAFE AS $$
 DECLARE
     path category_path_segment[] := ARRAY[]::category_path_segment[];
     current_id categories.id%TYPE := start_id;
     current_name categories.name%TYPE;
     current_parent categories.parent%TYPE;
 BEGIN
+    -- Locking the entire table is acceptable; creating categories is an infrequent, manual action.
+    PERFORM 1
+    FROM categories
+    ORDER BY id
+    FOR SHARE;
+
     LOOP
         SELECT id, name, parent
         INTO STRICT current_id, current_name, current_parent
@@ -451,6 +424,7 @@ FOR EACH ROW EXECUTE FUNCTION products_validate_discounts();
 -- allows due to the limit having changed. Similarly, it is possible for a non-member to have used
 -- members-only special offer due to the status of the latter having changed. These are not errors
 -- and nothing should be changed about the history, it should only prevent future uses.
+-- NOTE: Rows with 0 uses are allowed to serve as locks in `checkout`.
 CREATE TABLE special_offer_uses (
     customer INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     special_offer INT NOT NULL REFERENCES special_offers(id) ON DELETE CASCADE,
@@ -484,12 +458,19 @@ CREATE FUNCTION process_expiries() RETURNS TABLE (
     -- stock has been reduced for reasons other than expiries or purchases, in which case this
     -- does *not* represent the number of products that actually expired.
     total BIGINT
-) LANGUAGE sql VOLATILE AS $$
-    WITH product_lock AS (
-        SELECT id
-        FROM products
-        JOIN pending_expiries ON pending_expiries.product = products.id
-        FOR UPDATE OF products
+) LANGUAGE sql AS $$
+    WITH products_lock AS (
+        SELECT p.id
+        FROM products p
+        JOIN pending_expiries ON pending_expiries.product = p.id
+        ORDER BY p.id
+        FOR NO KEY UPDATE OF products
+    ),
+    expiries_lock AS (
+        SELECT 1
+        FROM pending_expiries
+        ORDER BY product, expiry
+        FOR NO KEY UPDATE
     ),
     processed AS (
         UPDATE pending_expiries
@@ -534,6 +515,15 @@ LANGUAGE plpgsql AS $$
 DECLARE
     new_stock INT;
 BEGIN
+    -- Consistent lock order with `checkout`.
+    PERFORM 1
+    FROM products
+    WHERE id = product_id
+    FOR KEY SHARE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Product does not exist.';
+    END IF;
+
     IF expiry IS NOT NULL THEN
         INSERT INTO expiries (product, expiry, number)
         VALUES (product_id, expiry, number)
@@ -554,7 +544,7 @@ CREATE FUNCTION sale_remove_expiries(
     product_id expiries.product%TYPE,
     number INT
 ) RETURNS INT
-LANGUAGE plpgsql VOLATILE AS $$
+LANGUAGE plpgsql AS $$
 DECLARE
     remaining INT := number;
     current_date expiries.expiry%TYPE;
@@ -569,7 +559,7 @@ BEGIN
         FROM expiries
         WHERE product = product_id AND processed_at IS NULL
         ORDER BY expiry
-        FOR UPDATE
+        FOR NO KEY UPDATE
     LOOP
         IF current_number > remaining THEN
             UPDATE expiries
@@ -786,7 +776,7 @@ CREATE TRIGGER cart_update_time
 BEFORE UPDATE ON shopping_cart_items
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
-CREATE PROCEDURE set_visibility(product_id INT, visible BOOLEAN)
+CREATE PROCEDURE set_visibility(product_id products.id%TYPE, visible products.visible%TYPE)
 LANGUAGE plpgsql AS $$
 BEGIN
     IF NOT visible THEN
@@ -927,8 +917,11 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE OR REPLACE PROCEDURE checkout(
+CREATE PROCEDURE checkout(
     customer_id customers.id%TYPE,
+    -- If this is non-null, customer has seen that these offers should apply to their purchase.
+    -- Instead of getting active special offers the customer is eligible for, get these specifically
+    -- and check for validity and eligibility. Also fails if this contains duplicates.
     expected_offers INT[] DEFAULT NULL
 )
 LANGUAGE plpgsql AS $$
@@ -938,59 +931,87 @@ BEGIN
     PERFORM 1
     FROM customers
     WHERE id = customer_id
-    FOR UPDATE;
-
-    CREATE TEMP TABLE applied
-    ON COMMIT DROP AS
-    SELECT s.id, product, new_price, quantity1, quantity2,
-        GREATEST(limit_per_customer - COALESCE(number, 0), 0) AS remaining_uses
-    FROM special_offers s
-    JOIN customers ON customers.id = customer_id
-    LEFT JOIN LATERAL (
-        SELECT number
-        FROM special_offer_uses
-        WHERE special_offer = s.id AND customer = customer_id
-        FOR UPDATE
-    ) sou ON TRUE
-    WHERE valid_from <= CURRENT_TIMESTAMP
-        AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
-        AND (NOT members_only OR member_since IS NOT NULL)
-        AND (expected_offers IS NULL OR s.id = ANY(expected_offers));
-    IF expected_offers IS NOT NULL THEN
-        GET DIAGNOSTICS found_offers := ROW_COUNT;
-        IF found_offers < CARDINALITY(expected_offers) THEN
-            RAISE EXCEPTION 'One or more expected special offers was a duplicate, does not exist, is not active, or the customer is not eligible for it.';
-        END IF;
+    FOR KEY SHARE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Customer does not exist.';
     END IF;
 
     CREATE TEMP TABLE items
     ON COMMIT DROP AS
+    WITH to_delete AS (
+        SELECT 1
+        FROM shopping_cart_items
+        WHERE customer = customer_id
+        ORDER BY product
+        FOR UPDATE
+    ),
     WITH deleted AS (
         DELETE FROM shopping_cart_items
         WHERE customer = customer_id
         RETURNING product, number
     )
-    SELECT product, number
+    SELECT *
     FROM deleted;
-
     IF NOT FOUND THEN
-        -- RAISE NOTICE 'Checkout with no items.';
+        RAISE NOTICE 'Checkout with no items.';
         RETURN;
     END IF;
 
-    PERFORM id
-    FROM products
-    JOIN items ON product = id
-    ORDER BY id
-    FOR UPDATE;
+    PERFORM p.id
+    FROM products p
+    JOIN items ON items.product = p.id
+    ORDER BY p.id
+    FOR SHARE;
 
     IF EXISTS (
         SELECT 1
         FROM items
-        LEFT JOIN products ON id = product
-        WHERE id IS NULL OR NOT visible
+        LEFT JOIN products p ON p.id = items.product
+        WHERE p.id IS NULL OR NOT p.visible
     ) THEN
         RAISE EXCEPTION 'Checkout with missing or invisible product.';
+    END IF;
+
+    CREATE TEMP TABLE applied
+    ON COMMIT DROP AS
+    -- Filter offers first to avoid creating unnecessary rows, see below.
+    WITH eligible_offers AS (
+        SELECT s.id, s.product, s.new_price, s.quantity1, s.quantity2, s.limit_per_customer
+        FROM special_offers s
+        JOIN customers ON customers.id = customer_id
+        JOIN items ON items.product = s.product
+        WHERE valid_from <= CURRENT_TIMESTAMP
+            AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
+            AND (NOT members_only OR member_since IS NOT NULL)
+            AND (expected_offers IS NULL OR s.id = ANY(expected_offers))
+        ORDER BY s.id
+        FOR KEY SHARE OF s
+    )
+    SELECT id, product, new_price, quantity1, quantity2,
+        CASE
+            WHEN limit_per_customer IS NULL THEN NULL
+            ELSE GREATEST(limit_per_customer - COALESCE(sou.previous_uses, 0), 0)
+        END AS remaining_uses
+    FROM eligible_offers
+    LEFT JOIN LATERAL (
+        -- `special_offer_uses` must have a row to lock to prevent another call from
+        -- double-counting.
+        WITH insert_zeros AS (
+            INSERT INTO special_offer_uses (special_offer, customer, number)
+            VALUES (id, customer_id, 0)
+            ON CONFLICT (special_offer, customer) DO NOTHING
+        )
+        SELECT number
+        FROM special_offer_uses
+        WHERE special_offer = eligible_offers.id AND customer = customer_id
+        FOR NO KEY UPDATE
+    ) sou ON TRUE;
+    -- Consider better error reporting and ignoring duplicates instead of failing.
+    IF expected_offers IS NOT NULL THEN
+        GET DIAGNOSTICS found_offers := ROW_COUNT;
+        IF found_offers < CARDINALITY(expected_offers) THEN
+            RAISE EXCEPTION 'One or more expected special offers was a duplicate, does not exist, is not active, is for a product not in the cart, or the customer is not eligible for it.';
+        END IF;
     END IF;
 
     -- Fails on negative stock.
@@ -1004,28 +1025,18 @@ BEGIN
 
     CREATE TEMP TABLE results
     ON COMMIT DROP AS
-    SELECT i.product, number, amount_per_unit, measurement_unit, price, uses, a.id AS special_offer_id
+    SELECT i.product, i.number, p.amount_per_unit, p.measurement_unit, c.price, c.uses, a.id AS special_offer_id
     FROM items i
-    JOIN products ON products.id = i.product
-    JOIN applied a ON a.product = i.product
-    CROSS JOIN LATERAL calculate_price(
-        price,
-        number,
-        new_price,
-        quantity1,
-        quantity2,
-        CASE
-            WHEN members_only AND member_since IS NULL THEN 0
-            ELSE GREATEST(limit_per_customer - COALESCE(u.number, 0), 0)
-        END
-    ) AS calc;
+    JOIN products p ON p.id = i.product
+    LEFT JOIN applied a ON a.product = i.product
+    CROSS JOIN LATERAL calculate_price(p.price, i.number, a.new_price, a.quantity1, a.quantity2, a.remaining_uses) AS c;
 
     INSERT INTO special_offer_uses (special_offer, customer, number)
     SELECT special_offer_id, customer_id, uses
     FROM results
     WHERE special_offer_id IS NOT NULL AND uses > 0
     ON CONFLICT (special_offer, customer) DO UPDATE
-    SET uses = uses + EXCLUDED.uses;
+    SET number = number + EXCLUDED.number;
 
     INSERT INTO orders (customer, product, number, paid, special_offer_used, amount_per_unit, measurement_unit)
     SELECT customer_id, product, number, price, uses > 0, amount_per_unit, measurement_unit
