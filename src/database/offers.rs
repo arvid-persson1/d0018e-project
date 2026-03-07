@@ -6,7 +6,7 @@ use std::num::NonZeroU32;
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, connection},
+    crate::database::{POOL, QueryResultExt},
     sqlx::query,
 };
 
@@ -58,7 +58,7 @@ pub async fn create_special_offer(
         quantity1,
         quantity2,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -90,7 +90,7 @@ pub async fn set_special_offer_limit(
         special_offer.get(),
         i32::try_from(limit_per_customer.get())?,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -116,7 +116,7 @@ pub async fn set_special_offer_members_only(
         special_offer.get(),
         members_only,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -148,7 +148,7 @@ pub async fn set_special_offer_start(
         special_offer.get(),
         valid_from,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -171,7 +171,7 @@ pub async fn set_special_offer_start_now(special_offer: Id<SpecialOffer>) -> Res
         ",
         special_offer.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -204,7 +204,7 @@ pub async fn set_special_offer_end(
         special_offer.get(),
         valid_until,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -225,7 +225,7 @@ pub async fn delete_special_offer(special_offer: Id<SpecialOffer>) -> Result<()>
         ",
         special_offer.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -252,7 +252,7 @@ pub async fn set_special_offer_deal(special_offer: Id<SpecialOffer>, deal: Deal)
         quantity1,
         quantity2,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }

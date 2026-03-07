@@ -8,7 +8,7 @@ use std::num::NonZeroU32;
 #[cfg(feature = "server")]
 use {
     crate::database::{
-        RawId, connection,
+        POOL, RawId,
         products::{build_amount, try_build_special_offer},
     },
     sqlx::query_as,
@@ -418,7 +418,7 @@ pub async fn newest_products(
         i64::try_from(limit)?,
         i64::try_from(offset)?,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::into).collect())
     .map_err(Into::into)
@@ -477,7 +477,7 @@ pub async fn products_by_category(
         i64::try_from(limit)?,
         i64::try_from(offset)?,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::<ProductOverview>::into).collect::<Box<_>>())
     .inspect(|products| {
@@ -530,7 +530,7 @@ pub async fn best_discounts(
         i64::try_from(limit)?,
         i64::try_from(offset)?,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::<ProductOverviewDiscounted>::into).collect::<Box<_>>())
     .inspect(|products| {
@@ -585,7 +585,7 @@ pub async fn vendor_products(
         i64::try_from(offset)?,
         include_invisible,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::<ProductOverviewVendor>::into).collect::<Box<_>>())
     .inspect(|products| {
@@ -633,7 +633,7 @@ pub async fn favorites(
         i64::try_from(limit)?,
         i64::try_from(offset)?,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::into).collect())
     .map_err(Into::into)

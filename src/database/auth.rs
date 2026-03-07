@@ -8,7 +8,7 @@ use dioxus_fullstack::response::Response;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, build_pfp, connection},
+    crate::database::{POOL, QueryResultExt, build_pfp},
     argon2::{
         Argon2, PasswordHasher as _, PasswordVerifier as _,
         password_hash::{
@@ -127,7 +127,7 @@ pub async fn create_user(
             )
         },
     }
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -148,7 +148,7 @@ pub async fn log_in(username: Username, password: Box<str>) -> Result<Response> 
         ",
         &*username,
     )
-    .fetch_optional(connection())
+    .fetch_optional(&*POOL)
     .await?
     .ok_or_else(|| todo!())?;
 
@@ -209,7 +209,7 @@ pub async fn login_info(user: Id<User>) -> Result<Login> {
         ",
         user.get(),
     )
-    .fetch_one(connection())
+    .fetch_one(&*POOL)
     .await
     .map(|repr| Login::from_repr(user, repr))
     .map_err(|_| todo!())
@@ -280,6 +280,7 @@ impl LoginId {
 }
 
 // TODO: Remove.
+#[cfg(false)]
 mod usage {
     use super::login_info;
     use crate::database::{Id, RawId, User};

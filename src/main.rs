@@ -1,25 +1,22 @@
 //! The entrypoint for the app.
 
-#![allow(
-    clippy::same_name_method,
-    reason = "Dioxus Props macro generates conflicting method names"
-)]
-#![allow(clippy::missing_docs_in_private_items, reason = "Component parameters")]
 #![cfg_attr(feature = "server", feature(iter_collect_into))]
-#![cfg_attr(feature = "server", expect(clippy::todo, reason = "TODO"))]
+#![cfg_attr(feature = "server", feature(never_type))]
 
 pub mod components;
 use components::Navbar;
-use database::Id;
 pub mod database;
+///
 pub mod views;
-use database::{Category, Product, Vendor};
+use database::{Category, Id, Vendor};
 mod state;
+use state::GlobalState;
 
 use dioxus::prelude::*;
-use views::{CategoryPage, FavoritesPage, Home, ProductPage, ProfilePage, VendorPage};
-#[cfg(feature = "server")]
-use {database::init_connection, futures::executor::block_on};
+use views::{
+    Administration, CategoryPage, CustomerProfile, FavoritesPage, Home, Login, Product,
+    ProfilePage, Register, VendorLogin, VendorPage, VendorRegister,
+};
 
 /// Structure of all non-internal endpoints.
 #[derive(Debug, Clone, PartialEq, Routable)]
@@ -32,6 +29,9 @@ enum Route {
     /// See [`ProfilePage`].
     #[route("/profile", ProfilePage)]
     Profile,
+    /// See [`CustomerProfile`].
+    #[route("/customer-profile", CustomerProfile)]
+    CustomerProfile,
     /// See [`FavoritesPage`].
     #[route("/favorites", FavoritesPage)]
     Favorites,
@@ -42,10 +42,10 @@ enum Route {
         id: Id<Vendor>,
     },
     /// See [`ProductPage`].
-    #[route("/product/:id", ProductPage)]
+    #[route("/product/:id", Product)]
     Product {
         /// The ID of the product.
-        id: Id<Product>,
+        id: i32,
     },
     /// See [`CategoryPage`].
     #[route("/category/:id", CategoryPage)]
@@ -53,20 +53,38 @@ enum Route {
         /// The ID of the category.
         id: Id<Category>,
     },
+    /// See [`Login`].
+    #[route("/login", Login)]
+    Login,
+    /// See [`Register`].
+    #[route("/register", Register)]
+    Register,
+    /// See [`VendorLogin`].
+    #[route("/vendor-login", VendorLogin)]
+    VendorLogin,
+    /// See [`VendorRegister`].
+    #[route("/vendor-register", VendorRegister)]
+    VendorRegister,
+    /// See [`Administration`].
+    #[route("/admin", Administration)]
+    Administration,
     // TODO: Shopping cart page.
 }
 
+#[allow(non_snake_case)]
 #[component]
 fn App() -> Element {
+    let _ = use_context_provider(|| Signal::new(GlobalState::default()));
     rsx! {
         // TODO: Is this required?
-        // script { src: "https://cdn.tailwindcss.com" }
+        document::Script { src: "https://cdn.tailwindcss.com" }
 
         // TODO: Inline icons.
-        // document::Link {
-        //     rel: "stylesheet",
-        //     href: "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css",
-        // }
+        document::Link {
+            rel: "stylesheet",
+            href: "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css",
+        }
+
         Router::<Route> {}
     }
 }
@@ -74,12 +92,5 @@ fn App() -> Element {
 /// # Panics
 /// Panics if `DATABASE_URL` environment variable is not set.
 fn main() {
-    #[cfg(feature = "server")]
-    {
-        let database_url = dotenvy::var("DATABASE_URL").expect("`DATABASE_URL` not set.");
-        block_on(init_connection(database_url))
-            .expect("Failed to establish a connection to the database.");
-    }
-
-    launch(App);
+    launch(App)
 }

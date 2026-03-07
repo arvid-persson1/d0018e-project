@@ -1,35 +1,16 @@
 use crate::Route;
-use crate::database::Category as CategoryMarker;
-use crate::database::Id;
+use crate::components::auth_dropdown::AuthDropdown;
+use crate::components::cart_dropdown::CartDropdown;
 use crate::database::categories::category_trees;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
-/// Props for sidebar category item.
-#[allow(
-    clippy::option_if_let_else,
-    clippy::ignored_unit_patterns,
-    clippy::same_name_method,
-    reason = "Dioxus macro limitations"
-)]
-#[derive(Props, Clone, PartialEq)]
-struct SidebarCategoryProps {
-    /// Category title.
-    title: Box<str>,
-    /// Category ID.
-    id: Id<CategoryMarker>,
-    /// Subcategories as (id, name) pairs.
-    subcategories: Vec<(Id<CategoryMarker>, Box<str>)>,
-    /// Called when user navigates.
-    on_navigate: EventHandler<()>,
-}
-
-/// Class for the category navigation bar
+// Class for the category navigation bar
+#[allow(non_snake_case)]
 #[component]
-fn SidebarCategory(props: SidebarCategoryProps) -> Element {
+fn SidebarCategory(title: String, id: i32, subcategories: Vec<(String, i32)>) -> Element {
     let mut is_open = use_signal(|| false);
     let rotation = if is_open() { "rotate-180" } else { "" };
-    let id = props.id;
 
     rsx! {
         div { class: "flex flex-col w-full border-b border-gray-100",
@@ -37,23 +18,21 @@ fn SidebarCategory(props: SidebarCategoryProps) -> Element {
                 class: "flex justify-between items-center py-4 px-2 cursor-pointer hover:bg-green-50 transition-colors",
                 onclick: move |_| is_open.toggle(),
                 Link {
-                    to: Route::Category { id },
+                    to: Route::Category { id: id.into() },
                     class: "font-bold text-gray-800 hover:text-green-700 flex-grow",
-                    onclick: move |_| props.on_navigate.call(()),
-                    "{props.title}"
+                    "{title}"
                 }
-                if !props.subcategories.is_empty() {
-                    i { class: "fa-solid fa-chevron-down transition-transform duration-300 {rotation}" }
-                }
+                i { class: "fa-solid fa-chevron-down transition-transform duration-300 {rotation}" }
             }
-            if is_open() && !props.subcategories.is_empty() {
+            if is_open() {
                 div { class: "bg-gray-50 flex flex-col pb-2",
-                    for (sub_id , sub_name) in props.subcategories.iter() {
+                    for (name , sub_id) in subcategories.into_iter() {
                         Link {
-                            to: Route::Category { id: *sub_id },
+                            to: Route::Category {
+                                id: sub_id.into(),
+                            },
                             class: "pl-6 py-2 text-gray-600 hover:text-green-700 hover:bg-gray-100 text-sm transition-colors",
-                            onclick: move |_| props.on_navigate.call(()),
-                            "{sub_name}"
+                            "{name}"
                         }
                     }
                 }
@@ -62,30 +41,23 @@ fn SidebarCategory(props: SidebarCategoryProps) -> Element {
     }
 }
 
-/// Navbar
-#[allow(
-    clippy::option_if_let_else,
-    clippy::ignored_unit_patterns,
-    reason = "rsx! macro limitation"
-)]
+/// Navbar.
+#[allow(non_snake_case)]
 #[component]
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
+    let mut show_auth = use_signal(|| false);
+    let mut show_cart = use_signal(|| false);
     let global_state = use_context::<Signal<GlobalState>>();
 
     let fav_count = global_state.read().favorites.len();
-    let cart_total = global_state
-        .read()
-        .cart_items
-        .values()
-        .map(|n| n.get())
-        .sum::<u32>();
+    let cart_count = global_state.read().cart_count();
 
     // Hämta kategorier från databasen för sidebaren
     let categories = use_resource(|| async move { category_trees().await.unwrap_or_default() });
 
     rsx! {
-        rect {
+        div {
             header { class: "w-full sticky top-0 z-50",
                 nav { class: "bg-gray-700 text-white p-5 flex items-center shadow-lg",
                     div { class: "container mx-auto flex items-center justify-between gap-4",
@@ -117,6 +89,7 @@ pub fn Navbar() -> Element {
                         }
 
                         div { class: "flex items-center gap-6",
+                            // Favoriter
                             Link {
                                 to: Route::Favorites {},
                                 class: "relative flex flex-col items-center hover:text-green-200 cursor-pointer transition",
@@ -128,14 +101,40 @@ pub fn Navbar() -> Element {
                                     }
                                 }
                             }
-                            // TODO(db): Koppla till inloggningssida/användarprofil
-                            div { class: "flex flex-col items-center hover:text-green-200 cursor-pointer transition",
-                                i { class: "fa-solid fa-circle-user text-2xl" }
-                                span { class: "text-[10px] font-bold uppercase", "Konto" }
+
+                            // Konto
+                            // TODO(db): Koppla "Konto"-knappen till inloggningssida/användarprofil
+                            div { class: "relative",
+                                button {
+                                    class: "flex flex-col items-center hover:text-green-200 cursor-pointer transition",
+                                    onclick: move |_| {
+                                        show_auth.toggle();
+                                        show_cart.set(false);
+                                    },
+                                    i { class: "fa-solid fa-circle-user text-2xl" }
+                                    span { class: "text-[10px] font-bold uppercase",
+                                        "Konto"
+                                    }
+                                }
+                                if show_auth() {
+                                    AuthDropdown { on_close: move |_| show_auth.set(false) }
+                                }
                             }
-                            button { class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
-                                i { class: "fa-solid fa-basket-shopping" }
-                                span { "{cart_total}" }
+
+                            // Kundvagn
+                            div { class: "relative",
+                                button {
+                                    class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
+                                    onclick: move |_| {
+                                        show_cart.toggle();
+                                        show_auth.set(false);
+                                    },
+                                    i { class: "fa-solid fa-basket-shopping" }
+                                    span { "{cart_count}" }
+                                }
+                                if show_cart() {
+                                    CartDropdown { on_close: move |_| show_cart.set(false) }
+                                }
                             }
                         }
                     }
@@ -162,19 +161,20 @@ pub fn Navbar() -> Element {
                                 i { class: "fa-solid fa-xmark text-2xl" }
                             }
                         }
-
                         div { class: "flex-grow overflow-y-auto p-4",
+                            // hårdkodade kategorier
+                            // TODO(db): Ersätt hårdkodade SidebarCategory-anrop med kategorier från databasen
+                            // TODO(db): Subkategorier ska också hämtas från databasen per kategori
                             match &*categories.read() {
                                 None => rsx! {
-                                    p { class: "text-gray-400 text-sm p-4", "Laddar kategorier..." }
+                                    p { class: "text-gray-400 text-sm p-4", "Laddar..." }
                                 },
                                 Some(trees) => rsx! {
                                     for tree in trees.iter() {
                                         SidebarCategory {
-                                            title: tree.name.clone(),
-                                            id: tree.id,
-                                            subcategories: tree.subcategories.iter().map(|s| (s.id, s.name.clone())).collect(),
-                                            on_navigate: move |_| show_sidebar.set(false),
+                                            title: tree.name.to_string(),
+                                            id: tree.id.get(),
+                                            subcategories: tree.subcategories.iter().map(|s| (s.name.to_string(), s.id.get())).collect(),
                                         }
                                     }
                                 },

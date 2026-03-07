@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, RawId, connection},
+    crate::database::{POOL, QueryResultExt, RawId},
     sqlx::{query, query_as},
     std::cmp::Reverse,
     tokio::task::spawn,
@@ -301,7 +301,7 @@ pub async fn product_reviews(
 ) -> Result<Box<[ProductReview]>> {
     let mut review_ids = Vec::with_capacity(limit);
 
-    let mut tx = connection()
+    let mut tx = POOL
         .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
         .await?;
 
@@ -417,7 +417,7 @@ pub async fn product_reviews_as(
     // Own review is fetched separately from usual limit.
     let mut review_ids = Vec::with_capacity(limit + 1);
 
-    let mut tx = connection()
+    let mut tx = POOL
         .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
         .await?;
 
@@ -573,7 +573,7 @@ pub async fn create_review(
         &title,
         &content,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -598,7 +598,7 @@ pub async fn update_review(review: Id<Review>, title: Box<str>, content: Box<str
         &title,
         &content,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -622,7 +622,7 @@ pub async fn delete_review(review: Id<Review>) -> Result<()> {
         ",
         review.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -645,7 +645,7 @@ pub async fn create_comment(user: Id<User>, parent: Id<Review>, content: Box<str
         parent.get(),
         &content,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -669,7 +669,7 @@ pub async fn create_reply(user: Id<User>, parent: Id<Comment>, content: Box<str>
         parent.get(),
         &content,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::expect_one)
     .map_err(Into::into)
@@ -691,7 +691,7 @@ pub async fn delete_comment(comment: Id<Comment>) -> Result<()> {
         ",
         comment.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -721,7 +721,7 @@ pub async fn set_vote_review(
             review.get(),
             vote as Vote,
         )
-        .execute(connection())
+        .execute(&*POOL)
         .await
         .map(QueryResultExt::expect_one)
         .map_err(Into::into)
@@ -734,7 +734,7 @@ pub async fn set_vote_review(
             customer.get(),
             review.get(),
         )
-        .execute(connection())
+        .execute(&*POOL)
         .await?
         .by_unique_key(|| todo!())
     }
@@ -765,7 +765,7 @@ pub async fn set_vote_comment(
             comment.get(),
             vote as Vote,
         )
-        .execute(connection())
+        .execute(&*POOL)
         .await
         .map(QueryResultExt::expect_one)
         .map_err(Into::into)
@@ -778,7 +778,7 @@ pub async fn set_vote_comment(
             customer.get(),
             comment.get(),
         )
-        .execute(connection())
+        .execute(&*POOL)
         .await?
         .by_unique_key(|| todo!())
     }
@@ -865,7 +865,7 @@ pub async fn customer_reviews(
         i64::try_from(limit)?,
         i64::try_from(offset)?,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|reviews| reviews.into_iter().map(Into::into).collect())
     .map_err(Into::into)

@@ -1,7 +1,7 @@
 use crate::components::ProductCard;
-
-use crate::database::products::newest_products;
+use crate::database::products::ProductInfo as Product;
 use dioxus::prelude::*;
+use rust_decimal::prelude::ToPrimitive;
 
 /// Home page..
 #[allow(
@@ -12,8 +12,7 @@ use dioxus::prelude::*;
 pub fn Home() -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop
     // TODO(db): Lägg till paginering eller lazy-loading när produktmängd växer
-    let products =
-        use_resource(|| async move { newest_products(None, 20, 0).await.unwrap_or_default() });
+    let products: Vec<Product> = vec![];
 
     rsx! {
         div { class: "min-h-screen bg-gray-50",
@@ -23,25 +22,18 @@ pub fn Home() -> Element {
                     p { class: "text-gray-600", "Vi är definitivt inte coop" }
                 }
 
-                match &*products.read() {
-                    None => rsx! {
-                        div { class: "flex justify-center py-20",
-                            p { class: "text-gray-400 text-lg", "Laddar produkter..." }
+                div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
+
+                    // loopa genom produkterna som läggs till
+                    for p in products {
+                        ProductCard {
+                            id: p.id.get(),
+                            name: p.name.clone(),
+                            price: p.price.to_f64().unwrap_or_default(),
+                            comparison_price: format!("{:.2} kr", p.price),
+                            image_url: p.gallery.first().cloned().unwrap_or_default(),
                         }
-                    },
-                    Some(items) => rsx! {
-                        div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
-                            for p in items.iter() {
-                                ProductCard {
-                                    id: p.id,
-                                    name: p.name.clone(),
-                                    price: p.price,
-                                    comparison_price: p.amount_per_unit.to_string().into(),
-                                    image_url: p.thumbnail.clone(),
-                                }
-                            }
-                        }
-                    },
+                    }
                 }
             }
         }

@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use std::num::NonZeroU32;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, connection},
+    crate::database::{POOL, QueryResultExt},
     sqlx::{query, query_as},
     std::num::NonZero,
 };
@@ -47,7 +47,7 @@ pub async fn cart_counts(customer: Id<Customer>) -> Result<HashMap<Id<Product>, 
         "#,
         customer.get(),
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await
     .map(|items| {
         items
@@ -90,7 +90,7 @@ pub async fn set_in_shopping_cart(
             customer.get(),
             product.get(),
         )
-        .execute(connection())
+        .execute(&*POOL)
         .await
         .map(QueryResultExt::expect_maybe)
         .map_err(Into::into)
@@ -106,7 +106,7 @@ pub async fn set_in_shopping_cart(
             product.get(),
             number,
         )
-        .execute(connection())
+        .execute(&*POOL)
         .await
         .map(QueryResultExt::expect_one)
         .map_err(Into::into)
@@ -131,7 +131,7 @@ pub async fn remove_deleted_from_cart(customer: Id<Customer>) -> Result<()> {
         ",
         customer.get(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::allow_any)
     .map_err(Into::into)
@@ -165,7 +165,7 @@ pub async fn checkout(
         customer.get(),
         expected_offers.as_deref(),
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await
     .map(QueryResultExt::procedure)
     .map_err(Into::into)

@@ -4,7 +4,7 @@ use crate::database::{Customer, Email, Id, Url, User, Username, Vendor};
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, connection},
+    crate::database::{POOL, QueryResultExt},
     sqlx::query,
 };
 
@@ -22,7 +22,7 @@ use {
 #[server]
 pub async fn delete_user(user: Id<User>) -> Result<()> {
     query!("CALL delete_user($1)", user.get())
-        .execute(connection())
+        .execute(&*POOL)
         .await
         .map(QueryResultExt::procedure)
         .map_err(Into::into)
@@ -46,7 +46,7 @@ pub async fn set_customer_profile_picture(customer: Id<Customer>, url: Url) -> R
         customer.get(),
         &url,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -69,7 +69,7 @@ pub async fn set_vendor_profile_picture(vendor: Id<Vendor>, url: Url) -> Result<
         vendor.get(),
         &url,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -93,7 +93,7 @@ pub async fn set_username(user: Id<User>, username: Username) -> Result<()> {
         user.get(),
         &*username,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -117,7 +117,7 @@ pub async fn set_email(user: Id<User>, email: Email) -> Result<()> {
         user.get(),
         &*email,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -140,7 +140,7 @@ pub async fn set_vendor_display_name(vendor: Id<Vendor>, display_name: Box<str>)
         vendor.get(),
         &display_name,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }
@@ -163,7 +163,7 @@ pub async fn set_vendor_description(vendor: Id<Vendor>, description: Box<str>) -
         vendor.get(),
         &description,
     )
-    .execute(connection())
+    .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
 }

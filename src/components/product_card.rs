@@ -1,40 +1,32 @@
 use crate::Route;
-use crate::database::{Id, Product};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
-use rust_decimal::Decimal;
 
 // class for a product card
-#[allow(
-    missing_docs,
-    clippy::same_name_method,
-    reason = "Dioxus Props macro limitation"
-)]
-#[derive(Props, Debug, Clone, PartialEq, Eq)]
-
-/// props for productCard
-pub struct ProductCardProps {
-    /// The product ID
-    pub id: Id<Product>,
-    /// The product name
-    pub name: Box<str>,
-    /// The base price
-    pub price: Decimal,
-    /// URL to the product image
-    pub image_url: Box<str>,
-    /// Comparison price string
-    pub comparison_price: Box<str>,
+#[derive(Props, Debug, Clone, PartialEq)]
+#[expect(missing_docs, reason = "TODO")]
+pub struct ProductProps {
+    pub id: i32,
+    pub name: String,
+    pub price: f64,
+    pub image_url: String,
+    pub comparison_price: String,
 }
 
-/// Product card component
+/// Product card.
 #[component]
-pub fn ProductCard(props: ProductCardProps) -> Element {
+pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
 
-    let id = props.id;
-    let count = global_state.read().cart_count(id);
-    let is_favorite = global_state.read().favorites.contains(&id);
+    // TODO(db): Favoriter ska hämtas från databasen per inloggad användare
+    let is_favorite = global_state.read().favorites.contains(&props.id);
 
+    let product_id = props.id;
+    let product_name = props.name.clone();
+    let product_price = props.price;
+    let product_image = props.image_url.clone();
+
+    // Pris format
     let formatted_price = format!("{:.2}", props.price).replace('.', ",");
     let formatted_comparison = props.comparison_price.replace('.', ",");
 
@@ -44,10 +36,21 @@ pub fn ProductCard(props: ProductCardProps) -> Element {
         "text-gray-400 hover:text-red-500"
     };
 
+    let quantity = global_state
+        .read()
+        .cart
+        .iter()
+        .find(|i| i.product_id == product_id)
+        .map(|i| i.quantity)
+        .unwrap_or(0);
     rsx! {
         div { class: "bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition p-4 flex flex-col gap-3 relative",
 
-            Link { to: Route::Product { id },
+            // Länk i bilden för produktsidan
+            Link {
+                to: Route::Product {
+                    id: props.id.into(),
+                },
                 img {
                     src: "{props.image_url}",
                     class: "w-full h-60 object-contain mb-2 cursor-pointer hover:opacity-80 transition",
@@ -55,7 +58,10 @@ pub fn ProductCard(props: ProductCardProps) -> Element {
             }
 
             div { class: "flex flex-col gap-0.5",
-                Link { to: Route::Product { id },
+                Link {
+                    to: Route::Product {
+                        id: props.id.into(),
+                    },
                     h3 { class: "font-bold text-lg text-gray-800 hover:text-green-700 cursor-pointer",
                         "{props.name}"
                     }
@@ -64,32 +70,58 @@ pub fn ProductCard(props: ProductCardProps) -> Element {
                 p { class: "text-gray-500 text-xs font-medium", "Jfr pris {formatted_comparison}" }
             }
 
+            // Köpknapp och favoritknapp
             div { class: "flex items-center gap-2 mt-auto",
-                if count == 0 {
+                if quantity == 0 {
                     button {
                         class: "flex-grow bg-green-700 text-white font-bold py-2 rounded-full hover:bg-green-800 transition flex justify-center items-center gap-2",
-                        onclick: move |_| global_state.write().add_to_cart(id),
+                        onclick: move |_| {
+                            // TODO(db): Ersätt med API-anrop set_in_shopping_cart(customer_id, product_id, 1)
+                            global_state
+                                .write()
+                                .add_to_cart(
+                                    product_id,
+                                    product_name.clone(),
+                                    product_price,
+                                    product_image.clone(),
+                                );
+                        },
                         i { class: "fas fa-shopping-cart" }
                     }
                 } else {
                     div { class: "flex-grow flex items-center justify-between bg-green-100 rounded-full overflow-hidden",
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
-                            onclick: move |_| global_state.write().remove_from_cart(id),
+                            onclick: move |_| {
+                                // TODO(db): Ersätt med API-anrop set_in_shopping_cart(customer_id, product_id, quantity-1)
+                                global_state.write().set_quantity(product_id, quantity - 1);
+                            },
                             i { class: "fas fa-minus" }
                         }
-                        span { class: "font-bold text-green-900", "{count}" }
+                        span { class: "font-bold text-green-900", "{quantity}" }
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
-                            onclick: move |_| global_state.write().add_to_cart(id),
+                            onclick: move |_| {
+                                // TODO(db): Ersätt med API-anrop set_in_shopping_cart(customer_id, product_id, quantity+1)
+                                global_state.write().set_quantity(product_id, quantity + 1);
+                            },
                             i { class: "fas fa-plus" }
                         }
                     }
                 }
 
+                // Favoritknapp
+                // TODO(db): Ersätt med API-anrop
                 button {
                     class: "p-2 transition-colors {heart_class} text-xl",
-                    onclick: move |_| global_state.write().toggle_favorite(id),
+                    onclick: move |_| {
+                        let mut state = global_state.write();
+                        if state.favorites.contains(&product_id) {
+                            state.favorites.retain(|&x| x != product_id);
+                        } else {
+                            state.favorites.push(product_id);
+                        }
+                    },
                     if is_favorite {
                         i { class: "fa-solid fa-heart" }
                     } else {

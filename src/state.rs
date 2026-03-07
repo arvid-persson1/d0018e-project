@@ -1,64 +1,53 @@
 //use dioxus::prelude::*;
-//! Global application state.
-use crate::database::{Id, Product};
-use hashbrown::HashMap;
-use std::num::NonZeroU32;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CartItem {
+    pub product_id: i32,
+    pub name: String,
+    pub price: f64,
+    pub image_url: String,
+    pub quantity: u32,
+}
 
 /// Global state shared across the app.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default)]
 pub struct GlobalState {
-    /// Cart items: product ID
-    pub cart_items: HashMap<Id<Product>, NonZeroU32>,
-    /// Favorited product IDs
-    pub favorites: Vec<Id<Product>>,
+    pub cart: Vec<CartItem>,
+    pub favorites: Vec<i32>,
 }
 
 impl GlobalState {
-    /// Get the total number of items in the cart
-    #[allow(dead_code, reason = "Will be used when cart page is implemented")]
-    pub fn cart_total(&self) -> u32 {
-        self.cart_items.values().map(|n| n.get()).sum()
-    }
-
-    /// Get the quantity of a specific product in the cart
-    #[must_use]
-    pub fn cart_count(&self, id: Id<Product>) -> u32 {
-        self.cart_items.get(&id).map_or(0, |n| n.get())
-    }
-
-    /// # Panics
-    /// Never panics in practice.
-    /// Add one unit of a product to the cart
-    pub fn add_to_cart(&mut self, id: Id<Product>) {
-        use std::num::NonZero;
-        let entry = self
-            .cart_items
-            .entry(id)
-            .or_insert(NonZero::new(1).expect("1 is non-zero"));
-        *entry = NonZero::new(entry.get() + 1).unwrap_or(*entry);
-    }
-
-    /// # Panics  
-    /// Never panics in practice.
-    /// Remove one unit of a product from the cart
-    /// Removes if count reaches 0
-    pub fn remove_from_cart(&mut self, id: Id<Product>) {
-        use std::num::NonZero;
-        if let Some(count) = self.cart_items.get_mut(&id) {
-            if count.get() <= 1 {
-                let _ = self.cart_items.remove(&id);
-            } else {
-                *count = NonZero::new(count.get() - 1).expect("count - 1 is non-zero");
-            }
-        }
-    }
-
-    /// Toggle favorite status for a product
-    pub fn toggle_favorite(&mut self, id: Id<Product>) {
-        if self.favorites.contains(&id) {
-            self.favorites.retain(|&x| x != id);
+    pub fn add_to_cart(&mut self, product_id: i32, name: String, price: f64, image_url: String) {
+        if let Some(item) = self.cart.iter_mut().find(|i| i.product_id == product_id) {
+            item.quantity += 1;
         } else {
-            self.favorites.push(id);
+            self.cart.push(CartItem {
+                product_id,
+                name,
+                price,
+                image_url,
+                quantity: 1,
+            });
         }
+    }
+
+    pub fn set_quantity(&mut self, product_id: i32, quantity: u32) {
+        if quantity == 0 {
+            self.cart.retain(|i| i.product_id != product_id);
+        } else if let Some(item) = self.cart.iter_mut().find(|i| i.product_id == product_id) {
+            item.quantity = quantity;
+        }
+    }
+
+    pub fn remove_from_cart(&mut self, product_id: i32) {
+        self.cart.retain(|i| i.product_id != product_id);
+    }
+
+    pub fn cart_total(&self) -> f64 {
+        self.cart.iter().map(|i| i.price * i.quantity as f64).sum()
+    }
+
+    pub fn cart_count(&self) -> usize {
+        self.cart.iter().map(|i| i.quantity as usize).sum()
     }
 }

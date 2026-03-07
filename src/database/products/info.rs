@@ -12,7 +12,7 @@ use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
     crate::database::{
-        RawId, connection,
+        POOL, RawId,
         products::{build_amount, build_average_rating, try_build_special_offer},
     },
     sqlx::{Type, query_as},
@@ -243,7 +243,7 @@ pub async fn product_info(
         customer.map(Id::get),
         product.get()
     )
-    .fetch_one(connection())
+    .fetch_one(&*POOL)
     .await
     .map(|repr| ProductInfo::from_repr(product, repr))
     .map_err(Into::into)
@@ -352,7 +352,7 @@ pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Resu
         i64::try_from(limit)?,
         i64::try_from(offset)?,
     )
-    .fetch_all(connection())
+    .fetch_all(&*POOL)
     .await?
     .into_iter()
     .map(|purchase| (purchase.time, Purchase::from(purchase)))
