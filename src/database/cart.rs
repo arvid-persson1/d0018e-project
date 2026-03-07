@@ -40,11 +40,11 @@ pub type Counts = HashMap<Id<Product>, NonZeroU32>;
 pub async fn cart_counts(customer: Id<Customer>) -> Result<HashMap<Id<Product>, NonZeroU32>> {
     query_as!(
         CartCountRepr,
-        "
-        SELECT product, number
+        r#"
+        SELECT product AS "product!", number
         FROM shopping_cart_items
         WHERE customer = $1 AND product IS NOT NULL
-        ",
+        "#,
         customer.get(),
     )
     .fetch_all(connection())

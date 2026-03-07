@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{QueryResultExt, RawId, Role, connection},
+    crate::database::{QueryResultExt, RawId, connection},
     sqlx::{query, query_as},
     std::cmp::Reverse,
     tokio::task::spawn,
@@ -167,7 +167,6 @@ struct CommentRepr {
     username: String,
     customer_pfp: Option<String>,
     vendor_pfp: Option<String>,
-    role: Role,
     content: String,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
@@ -268,36 +267,14 @@ struct CommentReprCustomer {
     review: RawId,
     user_id: RawId,
     username: String,
-    customer_pfp: Option<String>,
-    vendor_pfp: Option<String>,
-    role: Role,
     content: String,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
     sum_votes: i64,
     own_vote: Option<Vote>,
-}
-
-/// Construct a [`ProfilePicture`] from its role-dependent representation in the database.
-///
-/// # Panics
-///
-/// Panics if the values do not uphold any of the database's invariants.
-#[cfg(feature = "server")]
-#[expect(dead_code, reason = "TODO")]
-#[expect(clippy::unreachable, reason = "Database validation only.")]
-fn build_pfp(
-    role: Role,
+    // Fetched separately to identify role.
     customer_pfp: Option<String>,
     vendor_pfp: Option<String>,
-) -> ProfilePicture {
-    match (role, customer_pfp, vendor_pfp) {
-        (Role::Customer, Some(url), None) | (Role::Vendor, None, Some(url)) => {
-            ProfilePicture::new(url.into())
-        },
-        (Role::Administrator, None, None) => ProfilePicture::admin(),
-        _ => unreachable!("Database returned inconsistent profile picture data."),
-    }
 }
 
 /// Get reviews and associated comments for a product sorted by score, for display on product
@@ -358,7 +335,7 @@ pub async fn product_reviews(
     let comments = query_as!(
         CommentRepr,
         r#"
-        SELECT c.id, parent, review, user_id, username, role AS "role: Role", content, c.created_at, c.updated_at,
+        SELECT c.id, parent, review, user_id, username, content, c.created_at, c.updated_at,
             customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,
             COALESCE(SUM(CASE comment_votes.grade
                 WHEN 'like' THEN 1
@@ -370,7 +347,7 @@ pub async fn product_reviews(
         LEFT JOIN vendors ON vendors.id = c.user_id
         LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($1)
-        GROUP BY c.id, username, role, customer_pfp, vendor_pfp
+        GROUP BY c.id, username, customer_pfp, vendor_pfp
         ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         &*reviews
@@ -503,8 +480,8 @@ pub async fn product_reviews_as(
     let comments = query_as!(
         CommentReprCustomer,
         r#"
-        SELECT c.id, parent, review, user_id, username, role AS "role: Role", content, c.created_at, c.updated_at,
-            customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,
+        SELECT c.id, parent, review, user_id, username, content, c.created_at, c.updated_at,
+            cu.profile_picture AS customer_pfp, ve.profile_picture AS vendor_pfp,
             COALESCE(SUM(CASE comment_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
@@ -516,11 +493,11 @@ pub async fn product_reviews_as(
             ) AS "own_vote: Vote"
         FROM comments c
         JOIN users ON users.id = c.user_id
-        LEFT JOIN customers ON customers.id = c.user_id
-        LEFT JOIN vendors ON vendors.id = c.user_id
+        LEFT JOIN customers cu ON cu.id = c.user_id
+        LEFT JOIN vendors ve ON ve.id = c.user_id
         LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($2)
-        GROUP BY c.id, username, role, customer_pfp, vendor_pfp
+        GROUP BY c.id, username, customer_pfp, vendor_pfp
         ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         customer.get(),

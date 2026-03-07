@@ -7,6 +7,7 @@ repository = "https://www.github.com/arvid-persson1/d0018e-project"
 version = "0.1.0"
 
 [dependencies]
+argon2 = { default-features = false, features = ["std"], optional = true, version = "0.5.3" }
 derive_more = { default-features = false, features = [
     "deref",
     "display",
@@ -26,6 +27,7 @@ hashbrown = { default-features = false, features = [
     "nightly",
     "serde",
 ], version = "0.16.1" }
+http = { default-features = false, features = ["std"], optional = true, version = "1.4.0" }
 nameof = "1.3.0"
 regex = { default-features = false, features = [
     "perf",
@@ -49,11 +51,20 @@ tokio = { default-features = false, features = [
     "rt-multi-thread",
     "sync",
 ], optional = true, version = "1.49.0" }
+web-sys = { features = ["HtmlDocument"], optional = true, version = "0.3.91" }
 
 [features]
 default = ["web"]
-server = ["dep:dotenvy", "dep:futures", "dep:sqlx", "dep:tokio", "dioxus/server"]
-web = ["dioxus/web"]
+server = [
+    "dep:argon2",
+    "dep:dotenvy",
+    "dep:futures",
+    "dep:http",
+    "dep:sqlx",
+    "dep:tokio",
+    "dioxus/server",
+]
+web = ["dep:web-sys", "dioxus/web"]
 
 [profile.dev]
 codegen-units = 256

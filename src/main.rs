@@ -5,7 +5,7 @@
     reason = "Dioxus Props macro generates conflicting method names"
 )]
 #![allow(clippy::missing_docs_in_private_items, reason = "Component parameters")]
-#![feature(iter_collect_into)]
+#![cfg_attr(feature = "server", feature(iter_collect_into))]
 #![cfg_attr(feature = "server", expect(clippy::todo, reason = "TODO"))]
 
 pub mod components;

@@ -443,6 +443,7 @@ pub async fn newest_products(
 /// - `limit > i64::MAX`.
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
+// TODO: Include products in subcategories.
 #[server]
 pub async fn products_by_category(
     customer: Option<Id<Customer>>,

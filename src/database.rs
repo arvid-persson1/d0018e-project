@@ -6,6 +6,8 @@
     reason = "Generates a lot of noise for mappings. Documentation is delegated to either corresponding public items, or database schema."
 )]
 
+// TODO: Replace `#[server]` usage with method-specific attributes.
+
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use {
@@ -160,5 +162,21 @@ impl QueryResultExt for QueryResult {
             1 => Ok(()),
             _ => unreachable!("Non-unique key."),
         }
+    }
+}
+
+/// Construct a [`ProfilePicture`] from its role-dependent representation in the database.
+///
+/// # Panics
+///
+/// Panics if the values do not uphold any of the database's invariants.
+#[cfg(feature = "server")]
+#[expect(clippy::unreachable, reason = "Database validation only.")]
+fn build_pfp(customer_pfp: Option<String>, vendor_pfp: Option<String>) -> (Role, ProfilePicture) {
+    match (customer_pfp, vendor_pfp) {
+        (Some(url), None) => (Role::Customer, ProfilePicture::new(url.into())),
+        (None, Some(url)) => (Role::Vendor, ProfilePicture::new(url.into())),
+        (None, None) => (Role::Administrator, ProfilePicture::admin()),
+        _ => unreachable!("Database returned inconsistent profile picture data."),
     }
 }

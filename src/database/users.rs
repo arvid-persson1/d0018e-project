@@ -21,7 +21,7 @@ use {
 /// - An error occurs during communication with the database.
 #[server]
 pub async fn delete_user(user: Id<User>) -> Result<()> {
-    query!("SELECT delete_user($1)", user.get())
+    query!("CALL delete_user($1)", user.get())
         .execute(connection())
         .await
         .map(QueryResultExt::procedure)
