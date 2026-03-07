@@ -14,7 +14,7 @@ pub fn Login() -> Element {
             div { class: "bg-white rounded-2xl shadow-sm p-8 w-full max-w-md",
                 div { class: "text-center mb-8",
                     div { class: "text-4xl font-black italic text-green-700 mb-2", "boop" }
-                    h1 { class: "text-2xl font-black text-gray-900", "Logga in som priatperson" }
+                    h1 { class: "text-2xl font-black text-gray-900", "Logga in som privatperson" }
                 }
                 div { class: "space-y-4",
                     input {
@@ -29,6 +29,22 @@ pub fn Login() -> Element {
                     }
                     button { class: "w-full bg-green-700 text-white font-black py-3 rounded-full",
                         "Logga in"
+                    }
+                }
+                div { class: "text-center mt-6 text-sm text-gray-500",
+                    "Har du inget konto? "
+                    Link {
+                        to: Route::Register {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Skapa konto här"
+                    }
+                }
+                div { class: "text-center mt-2 text-sm text-gray-400",
+                    "Är du företag? "
+                    Link {
+                        to: Route::VendorLogin {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Logga in som företag"
                     }
                 }
             }
@@ -58,6 +74,22 @@ pub fn Register() -> Element {
                     }
                     button { class: "w-full bg-green-700 text-white font-black py-3 rounded-full",
                         "Skapa konto"
+                    }
+                }
+                div { class: "text-center mt-6 text-sm text-gray-500",
+                    "Har du redan ett konto? "
+                    Link {
+                        to: Route::Login {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Logga in här"
+                    }
+                }
+                div { class: "text-center mt-2 text-sm text-gray-400",
+                    "Är du företag? "
+                    Link {
+                        to: Route::VendorRegister {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Skapa företagskonto"
                     }
                 }
             }
@@ -91,6 +123,22 @@ pub fn VendorLogin() -> Element {
                         "Logga in"
                     }
                 }
+                div { class: "text-center mt-6 text-sm text-gray-500",
+                    "Har du inget företagskonto? "
+                    Link {
+                        to: Route::VendorRegister {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Skapa företagskonto här"
+                    }
+                }
+                div { class: "text-center mt-2 text-sm text-gray-400",
+                    "Är du privatperson? "
+                    Link {
+                        to: Route::Login {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Logga in som privatperson"
+                    }
+                }
             }
         }
     }
@@ -119,7 +167,23 @@ pub fn VendorRegister() -> Element {
                         class: "w-full border-2 border-gray-200 rounded-xl px-4 py-3",
                     }
                     button { class: "w-full bg-green-700 text-white font-black py-3 rounded-full",
-                        "Skapa Buisness-konto"
+                        "Skapa Business-konto"
+                    }
+                }
+                div { class: "text-center mt-6 text-sm text-gray-500",
+                    "Har du redan ett företagskonto? "
+                    Link {
+                        to: Route::VendorLogin {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Logga in här"
+                    }
+                }
+                div { class: "text-center mt-2 text-sm text-gray-400",
+                    "Är du privatperson? "
+                    Link {
+                        to: Route::Register {},
+                        class: "text-green-700 font-bold hover:underline",
+                        "Skapa privatkonto"
                     }
                 }
             }

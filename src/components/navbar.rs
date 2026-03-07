@@ -180,8 +180,8 @@ pub fn Navbar() -> Element {
                                             title: tree.name.to_string(),
                                             id: tree.id.get(),
                                             subcategories: tree.subcategories.iter()
-                                                                                                                                                                                                                                                                                                                                                                                                                            .map(|s| (s.name.to_string(), s.id.get()))
-                                                                                                                                                                                                                                                                                                                                                                                                                            .collect(),
+                                                                                        .map(|s| (s.name.to_string(), s.id.get()))
+                                                                                        .collect(),
                                         }
                                     }
                                 },
@@ -194,4 +194,4 @@ pub fn Navbar() -> Element {
             Outlet::<Route> {}
         }
     }
-    }
+}
