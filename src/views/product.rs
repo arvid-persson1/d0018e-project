@@ -13,8 +13,7 @@ use dioxus::prelude::*;
 pub fn Product(id: i32) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
     let nav = use_navigator();
-    
-    // Konvertera i32 till Id<DbProduct> för databasanropet
+
     let db_id = Id::<DbProduct>::from(id);
 
     // Form-signaler för recensioner
@@ -22,24 +21,19 @@ pub fn Product(id: i32) -> Element {
     let mut selected_rating = use_signal(|| 0_u8);
     let max_chars = 300;
 
-    // Hämta in produkt data
-    // TODO(db): Ersätt get_fake_products() + find med ett API-anrop per produkt
-    let _product_data = use_resource(move || async move { 
-        product_info(None, db_id).await 
-    });
-    // TODO(db): Skicka med inloggad kunds ID när login finns: Some(customer_id)
+    // TODO(auth): Skicka med inloggad kunds ID: Some(customer_id)
     let product_resource = use_resource(move || async move {
-        
-        crate::database::products::product_info(None, id.into()).await
+        product_info(None, db_id).await
     });
-    // Prisformatering
+
     let is_favorite = global_state.read().favorites.contains(&id);
-    let count = global_state.read().cart_items.iter().filter(|&&i| i == id).count();
-    let heart_class = if is_favorite {
-        "text-red-500"
-    } else {
-        "text-gray-400 hover:text-red-500"
-    };
+    let quantity = global_state.read().cart.iter()
+        .find(|i| i.product_id == id)
+        .map(|i| i.quantity)
+        .unwrap_or(0);
+
+    let heart_class = if is_favorite { "text-red-500" } else { "text-gray-400 hover:text-red-500" };
+
 
     // Klass för betyg stjärnor
     let s1 = if selected_rating() >= 1 { "text-yellow-400" } else { "text-gray-300" };
@@ -63,26 +57,33 @@ pub fn Product(id: i32) -> Element {
 
             // Hantering av databas-resursen
             match &*product_resource.read_unchecked() {
-                // vänta på db
                 None => rsx! {
                     div { class: "flex justify-center items-center py-20",
                         p { class: "text-xl font-bold text-gray-400 animate-pulse", "Hämtar produkt från databasen..." }
                     }
                 },
-                // felmeddelande
                 Some(Err(e)) => rsx! {
                     div { class: "text-center p-20",
                         h2 { class: "text-red-500 text-2xl font-black", "Ett fel uppstod" }
                         p { class: "text-gray-500", "{e}" }
                     }
                 },
-                // lyckades!
                 Some(Ok(product)) => {
                     let formatted_price = format!("{:.2}", product.price).replace('.', ",");
                     let avg_rating = product.rating.rating().unwrap_or(0.0);
                     let rating_count = product.rating.count();
                     let full_stars = avg_rating.round() as usize;
 
+                    // Klona värden för closures
+                    let pname = product.name.to_string();
+                    let pprice = product.price.to_string().parse::<f64>().unwrap_or(0.0);
+                    let pimage = product
+                        .gallery
+                        .first()
+                        .map(|u| u.to_string())
+                        .unwrap_or_default();
+                    let pname2 = pname.clone();
+                    let pimage2 = pimage.clone();
                     rsx! {
                         div { class: "grid grid-cols-1 md:grid-cols-2 gap-12 mb-16",
 
@@ -96,12 +97,13 @@ pub fn Product(id: i32) -> Element {
                                         }
                                     }
                                 }
+
                                 // Betyg under bilden
                                 div { class: "mt-6 flex flex-col items-center gap-2",
                                     div { class: "flex text-yellow-400 text-xl",
                                         for i in 0..5_usize {
                                             if i < full_stars {
-                                                i { class: "fa-solid fa-star" }
+                                                i { class: "fa-solid fa-star" } // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, 1)
                                             } else {
                                                 i { class: "fa-regular fa-star" }
                                             }
@@ -111,25 +113,27 @@ pub fn Product(id: i32) -> Element {
                                         "{avg_rating:.1} av 5 ({rating_count} recensioner)"
                                     }
                                 }
-                            }
+                            } // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity+1)
 
                             // Info-sidan
                             div { class: "flex flex-col justify-start",
                                 h1 { class: "text-4xl font-black text-gray-900 mb-2", "{product.name}" }
-                                p { class: "text-gray-500 text-lg mb-4", "{product.description}" }
+                                p { class: "text-gray-500 text-lg mb-4", "{product.description}" } // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity+1)
 
                                 // Pris
                                 div { class: "border-t border-b py-6 mb-6",
-                                    div { class: "text-red-600 font-black text-5xl mb-1", "{formatted_price} kr" }
+                                    div { class: "text-red-600 font-black text-5xl mb-1", "{formatted_price} kr" } // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)
                                     div { class: "text-gray-500 font-bold", "Säljs av {product.vendor_name}" }
                                 }
 
                                 // Köp/Favorit knappar
                                 div { class: "flex gap-4 items-center h-16",
-                                    if count == 0 {
+                                    if quantity == 0 {
                                         button {
                                             class: "flex-grow h-full bg-green-700 text-white rounded-full font-black text-xl hover:bg-green-800 transition-colors shadow-md flex items-center justify-center gap-3",
-                                            onclick: move |_| global_state.write().cart_items.push(id),
+                                            onclick: move |_| {
+                                                global_state.write().add_to_cart(id, pname.clone(), pprice, pimage.clone());
+                                            },
                                             i { class: "fa-solid fa-cart-plus" }
                                             "LÄGG I VARUKORG"
                                         }
@@ -138,17 +142,18 @@ pub fn Product(id: i32) -> Element {
                                             button {
                                                 class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
                                                 onclick: move |_| {
-                                                    let mut s = global_state.write();
-                                                    if let Some(pos) = s.cart_items.iter().position(|&x| x == id) {
-                                                        let _removed = s.cart_items.remove(pos);
-                                                    }
+                                                    // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity-1)
+                                                    global_state.write().set_quantity(id, quantity - 1);
                                                 },
                                                 i { class: "fas fa-minus" }
                                             }
-                                            span { class: "font-black text-2xl text-green-900", "{count}" }
-                                            button {
+                                            span { class: "font-black text-2xl text-green-900", "{quantity}" }
+                                            button { // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite) // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite) // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite) // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)
                                                 class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
-                                                onclick: move |_| global_state.write().cart_items.push(id),
+                                                onclick: move |_| {
+                                                    // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity+1)
+                                                    global_state.write().set_quantity(id, quantity + 1);
+                                                },
                                                 i { class: "fas fa-plus" }
                                             }
                                         }
@@ -156,6 +161,7 @@ pub fn Product(id: i32) -> Element {
                                     button {
                                         class: "h-full px-6 border-2 border-gray-200 rounded-full transition-all {heart_class}",
                                         onclick: move |_| {
+                                            // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)
                                             let mut s = global_state.write();
                                             if s.favorites.contains(&id) {
                                                 s.favorites.retain(|&x| x != id);
@@ -220,7 +226,10 @@ pub fn Product(id: i32) -> Element {
                         button {
                             class: "bg-green-700 text-white px-8 py-3 rounded-full font-bold hover:bg-green-800 transition shadow-sm disabled:opacity-30 disabled:cursor-not-allowed",
                             disabled: selected_rating() == 0,
-                            onclick: move |_| println!("Betyg: {}", selected_rating()),
+                            onclick: move |_| {
+                                // TODO(db): Ersätt med create_review(customer_id, product_id, rating, text)
+                                println!("Betyg: {}", selected_rating());
+                            },
                             "Skicka recension"
                         }
                     }

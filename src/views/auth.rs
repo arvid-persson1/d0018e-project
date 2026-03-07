@@ -14,7 +14,7 @@ pub fn Login() -> Element {
             div { class: "bg-white rounded-2xl shadow-sm p-8 w-full max-w-md",
                 div { class: "text-center mb-8",
                     div { class: "text-4xl font-black italic text-green-700 mb-2", "boop" }
-                    h1 { class: "text-2xl font-black text-gray-900", "Logga in priatperson" }
+                    h1 { class: "text-2xl font-black text-gray-900", "Logga in som priatperson" }
                 }
                 div { class: "space-y-4",
                     input {
@@ -43,7 +43,7 @@ pub fn Register() -> Element {
             div { class: "bg-white rounded-2xl shadow-sm p-8 w-full max-w-md",
                 div { class: "text-center mb-8",
                     div { class: "text-4xl font-black italic text-green-700 mb-2", "boop" }
-                    h1 { class: "text-2xl font-black text-gray-900", "Skapa konto privatperson" }
+                    h1 { class: "text-2xl font-black text-gray-900", "Skapa konto som privatperson" }
                 }
                 div { class: "space-y-4",
                     input {
@@ -74,7 +74,7 @@ pub fn VendorLogin() -> Element {
             div { class: "bg-white rounded-2xl shadow-sm p-8 w-full max-w-md",
                 div { class: "text-center mb-8",
                     div { class: "text-4xl font-black italic text-green-700 mb-2", "boop" }
-                    h1 { class: "text-2xl font-black text-gray-900", "Logga in företag" }
+                    h1 { class: "text-2xl font-black text-gray-900", "Logga in för företag" }
                 }
                 div { class: "space-y-4",
                     input {
@@ -105,7 +105,7 @@ pub fn VendorRegister() -> Element {
             div { class: "bg-white rounded-2xl shadow-sm p-8 w-full max-w-md",
                 div { class: "text-center mb-8",
                     div { class: "text-4xl font-black italic text-green-700 mb-2", "boop" }
-                    h1 { class: "text-2xl font-black text-gray-900", "Skapa konto Företag" }
+                    h1 { class: "text-2xl font-black text-gray-900", "Skapa konto för företag" }
                 }
                 div { class: "space-y-4",
                     input {

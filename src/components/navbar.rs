@@ -1,6 +1,7 @@
 use crate::Route;
 use crate::state::GlobalState;
 use crate::components::auth_dropdown::AuthDropdown;
+use crate::components::cart_dropdown::CartDropdown;
 use dioxus::prelude::*;
 use crate::database::categories::category_trees;
 
@@ -16,8 +17,6 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<(String, i32)>) ->
             div {
                 class: "flex justify-between items-center py-4 px-2 cursor-pointer hover:bg-green-50 transition-colors",
                 onclick: move |_| is_open.toggle(),
-
-                // Länk till kategorisidan med rätt ID
                 Link {
                     to: Route::Category { id: id.into() },
                     class: "font-bold text-gray-800 hover:text-green-700 flex-grow",
@@ -25,7 +24,6 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<(String, i32)>) ->
                 }
                 i { class: "fa-solid fa-chevron-down transition-transform duration-300 {rotation}" }
             }
-
             if is_open() {
                 div { class: "bg-gray-50 flex flex-col pb-2",
                     for (name , sub_id) in subcategories.into_iter() {
@@ -49,14 +47,15 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<(String, i32)>) ->
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
     let mut show_auth = use_signal(|| false);
+    let mut show_cart = use_signal(|| false);
     let global_state = use_context::<Signal<GlobalState>>();
 
-    // TODO(db): fav_count och cart_total borde hämtas från databasen per inloggad användare istället för GlobalState
     let fav_count = global_state.read().favorites.len();
-    let cart_total = global_state.read().cart_items.len();
+    let cart_count = global_state.read().cart_count();
 
     // Hämta kategorier från databasen för sidebaren
     let categories = use_resource(|| async move { category_trees().await.unwrap_or_default() });
+
 
     rsx! {
         div {
@@ -95,7 +94,7 @@ pub fn Navbar() -> Element {
 
                         // Ikoner
                         div { class: "flex items-center gap-6",
-                            // favorit
+                            // Favoriter
                             Link {
                                 to: Route::Favorites {},
                                 class: "relative flex flex-col items-center hover:text-green-200 cursor-pointer transition",
@@ -107,12 +106,16 @@ pub fn Navbar() -> Element {
                                     }
                                 }
                             }
-                            // konto
+
+                            // Konto
                             // TODO(db): Koppla "Konto"-knappen till inloggningssida/användarprofil
                             div { class: "relative",
                                 button {
                                     class: "flex flex-col items-center hover:text-green-200 cursor-pointer transition",
-                                    onclick: move |_| show_auth.toggle(),
+                                    onclick: move |_| {
+                                        show_auth.toggle();
+                                        show_cart.set(false);
+                                    },
                                     i { class: "fa-solid fa-circle-user text-2xl" }
                                     span { class: "text-[10px] font-bold uppercase",
                                         "Konto"
@@ -124,9 +127,19 @@ pub fn Navbar() -> Element {
                             }
 
                             // Kundvagn
-                            button { class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
-                                i { class: "fa-solid fa-basket-shopping" }
-                                span { "{cart_total}" }
+                            div { class: "relative",
+                                button {
+                                    class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
+                                    onclick: move |_| {
+                                        show_cart.toggle();
+                                        show_auth.set(false);
+                                    },
+                                    i { class: "fa-solid fa-basket-shopping" }
+                                    span { "{cart_count}" }
+                                }
+                                if show_cart() {
+                                    CartDropdown { on_close: move |_| show_cart.set(false) }
+                                }
                             }
                         }
                     }
@@ -153,7 +166,6 @@ pub fn Navbar() -> Element {
                                 i { class: "fa-solid fa-xmark text-2xl" }
                             }
                         }
-
                         div { class: "flex-grow overflow-y-auto p-4",
                             // hårdkodade kategorier
                             // TODO(db): Ersätt hårdkodade SidebarCategory-anrop med kategorier från databasen
@@ -168,8 +180,8 @@ pub fn Navbar() -> Element {
                                             title: tree.name.to_string(),
                                             id: tree.id.get(),
                                             subcategories: tree.subcategories.iter()
-                                                                                                                                                                                                                             .map(|s| (s.name.to_string(), s.id.get()))
-                                                                                                                                                                                                                                .collect(),
+                                                                                                                                                                                                                                                                                                                                                                                                                            .map(|s| (s.name.to_string(), s.id.get()))
+                                                                                                                                                                                                                                                                                                                                                                                                                            .collect(),
                                         }
                                     }
                                 },
@@ -178,7 +190,8 @@ pub fn Navbar() -> Element {
                     }
                 }
             }
+
             Outlet::<Route> {}
         }
     }
-}
+    }

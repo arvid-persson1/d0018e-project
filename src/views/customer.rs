@@ -31,7 +31,7 @@ pub fn CustomerProfile() -> Element {
 
                 // Header
                 h1 { class: "text-3xl font-black text-gray-900 mb-8",
-                    "Ekologiska Gården AB"
+                    "Gården AB"
                                 // TODO(db): Replace with vendor.name
                 }
 
@@ -48,7 +48,7 @@ pub fn CustomerProfile() -> Element {
                                 }
                                 p {
                                     class: "font-bold text-gray-900 text-center",
-                                    "Ekologiska Gården AB"
+                                    "Gården AB"
                                                                 // TODO(db): Replace with vendor.name
                                 }
                             }
