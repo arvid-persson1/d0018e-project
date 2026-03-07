@@ -1,10 +1,14 @@
 use crate::Route;
+use crate::components::auth_dropdown::AuthDropdown;
+use crate::components::cart_dropdown::CartDropdown;
+use crate::database::categories::category_trees;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
 // Class for the category navigation bar
+#[allow(non_snake_case)]
 #[component]
-fn SidebarCategory(title: String, id: i32, subcategories: Vec<String>) -> Element {
+fn SidebarCategory(title: String, id: i32, subcategories: Vec<(String, i32)>) -> Element {
     let mut is_open = use_signal(|| false);
     let rotation = if is_open() { "rotate-180" } else { "" };
 
@@ -13,25 +17,22 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<String>) -> Elemen
             div {
                 class: "flex justify-between items-center py-4 px-2 cursor-pointer hover:bg-green-50 transition-colors",
                 onclick: move |_| is_open.toggle(),
-
-                // Länk till kategorisidan med rätt ID
                 Link {
-                    to: Route::Category { id },
+                    to: Route::Category { id: id.into() },
                     class: "font-bold text-gray-800 hover:text-green-700 flex-grow",
                     "{title}"
                 }
-
                 i { class: "fa-solid fa-chevron-down transition-transform duration-300 {rotation}" }
             }
-
             if is_open() {
                 div { class: "bg-gray-50 flex flex-col pb-2",
-                    for sub in subcategories {
-                        a {
+                    for (name , sub_id) in subcategories.into_iter() {
+                        Link {
+                            to: Route::Category {
+                                id: sub_id.into(),
+                            },
                             class: "pl-6 py-2 text-gray-600 hover:text-green-700 hover:bg-gray-100 text-sm transition-colors",
-                            href: "#",
-                            // TODO(db): Ersätt href="#" med riktiga subkategori-routes när de finns i databasen
-                            "{sub}"
+                            "{name}"
                         }
                     }
                 }
@@ -40,22 +41,27 @@ fn SidebarCategory(title: String, id: i32, subcategories: Vec<String>) -> Elemen
     }
 }
 
+/// Navbar.
+#[allow(non_snake_case)]
 #[component]
 pub fn Navbar() -> Element {
     let mut show_sidebar = use_signal(|| false);
+    let mut show_auth = use_signal(|| false);
+    let mut show_cart = use_signal(|| false);
     let global_state = use_context::<Signal<GlobalState>>();
 
-    // TODO(db): fav_count och cart_total borde hämtas från databasen per inloggad användare istället för GlobalState
     let fav_count = global_state.read().favorites.len();
-    let cart_total = global_state.read().cart_items.len();
+    let cart_count = global_state.read().cart_count();
+
+    // Hämta kategorier från databasen för sidebaren
+    let categories = use_resource(|| async move { category_trees().await.unwrap_or_default() });
 
     rsx! {
-        rect {
+        div {
             header { class: "w-full sticky top-0 z-50",
                 nav { class: "bg-gray-700 text-white p-5 flex items-center shadow-lg",
                     div { class: "container mx-auto flex items-center justify-between gap-4",
 
-                        // Logga
                         Link {
                             to: Route::Home {},
                             class: "bg-green-900 px-4 py-1 rounded-lg border border-green-600 shadow-inner flex items-center justify-center hover:bg-green-800 transition-colors cursor-pointer",
@@ -64,7 +70,6 @@ pub fn Navbar() -> Element {
                             }
                         }
 
-                        // Kategori-knapp
                         div { class: "flex justify-center items-center py-2 shadow-sm",
                             button {
                                 class: "flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700 transition-all duration-200 shadow-sm border border-gray-200",
@@ -73,7 +78,6 @@ pub fn Navbar() -> Element {
                             }
                         }
 
-                        // Sökfält
                         // TODO(db): Koppla sökfältet till en produkt-query
                         div { class: "flex-grow max-w-2xl relative hidden md:block",
                             i { class: "fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" }
@@ -84,9 +88,8 @@ pub fn Navbar() -> Element {
                             }
                         }
 
-                        // Ikoner
                         div { class: "flex items-center gap-6",
-                            // favorit
+                            // Favoriter
                             Link {
                                 to: Route::Favorites {},
                                 class: "relative flex flex-col items-center hover:text-green-200 cursor-pointer transition",
@@ -98,36 +101,57 @@ pub fn Navbar() -> Element {
                                     }
                                 }
                             }
-                            // konto
+
+                            // Konto
                             // TODO(db): Koppla "Konto"-knappen till inloggningssida/användarprofil
-                            div { class: "flex flex-col items-center hover:text-green-200 cursor-pointer transition",
-                                i { class: "fa-solid fa-circle-user text-2xl" }
-                                span { class: "text-[10px] font-bold uppercase", "Konto" }
+                            div { class: "relative",
+                                button {
+                                    class: "flex flex-col items-center hover:text-green-200 cursor-pointer transition",
+                                    onclick: move |_| {
+                                        show_auth.toggle();
+                                        show_cart.set(false);
+                                    },
+                                    i { class: "fa-solid fa-circle-user text-2xl" }
+                                    span { class: "text-[10px] font-bold uppercase",
+                                        "Konto"
+                                    }
+                                }
+                                if show_auth() {
+                                    AuthDropdown { on_close: move |_| show_auth.set(false) }
+                                }
                             }
-                            // kundvagn
-                            // TODO(db): cart_total ska hämtas från databasen
-                            button { class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
-                                i { class: "fa-solid fa-basket-shopping" }
-                                span { "{cart_total}" }
+
+                            // Kundvagn
+                            div { class: "relative",
+                                button {
+                                    class: "bg-white text-green-700 px-5 py-2 rounded-full font-black flex items-center gap-2 hover:bg-green-50 transition shadow-sm",
+                                    onclick: move |_| {
+                                        show_cart.toggle();
+                                        show_auth.set(false);
+                                    },
+                                    i { class: "fa-solid fa-basket-shopping" }
+                                    span { "{cart_count}" }
+                                }
+                                if show_cart() {
+                                    CartDropdown { on_close: move |_| show_cart.set(false) }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Sidebar meny
+            // Sidebar
             if show_sidebar() {
                 div { class: "fixed inset-0 z-[100] flex",
                     div {
                         class: "absolute inset-0 bg-black/50 transition-opacity",
                         onclick: move |_| show_sidebar.set(false),
                     }
-
                     div { class: "relative w-80 bg-white h-full shadow-xl flex flex-col",
-
                         div { class: "p-6 flex justify-between items-center border-b bg-gray-700 text-white",
                             Link {
-                                to: Route::Category { id: 0 },
+                                to: Route::Category { id: 0.into() },
                                 onclick: move |_| show_sidebar.set(false),
                                 h2 { class: "text-xl font-black hover:text-green-400 cursor-pointer",
                                     "Kategorier"
@@ -137,45 +161,29 @@ pub fn Navbar() -> Element {
                                 i { class: "fa-solid fa-xmark text-2xl" }
                             }
                         }
-
                         div { class: "flex-grow overflow-y-auto p-4",
                             // hårdkodade kategorier
                             // TODO(db): Ersätt hårdkodade SidebarCategory-anrop med kategorier från databasen
                             // TODO(db): Subkategorier ska också hämtas från databasen per kategori
-                            SidebarCategory {
-                                title: "Mejeri & Ägg".to_string(),
-                                id: 1,
-                                subcategories: vec![
-                                    "Mjölk".to_string(),
-                                    "Smör".to_string(),
-                                    "Ost".to_string(),
-                                    "Ägg".to_string(),
-                                ],
-                            }
-                            SidebarCategory {
-                                title: "Frukt & Grönt".to_string(),
-                                id: 2,
-                                subcategories: vec![
-                                    "Bananer".to_string(),
-                                    "Äpplen".to_string(),
-                                    "Sallad".to_string(),
-                                    "Rotfrukter".to_string(),
-                                ],
-                            }
-                            SidebarCategory {
-                                title: "Kött & Chark".to_string(),
-                                id: 3,
-                                subcategories: vec!["Nötkött".to_string(), "Kyckling".to_string(), "Korv".to_string()],
-                            }
-                            SidebarCategory {
-                                title: "Skafferi".to_string(),
-                                id: 4,
-                                subcategories: vec!["Pasta".to_string(), "Ris".to_string(), "Konserver".to_string()],
+                            match &*categories.read() {
+                                None => rsx! {
+                                    p { class: "text-gray-400 text-sm p-4", "Laddar..." }
+                                },
+                                Some(trees) => rsx! {
+                                    for tree in trees.iter() {
+                                        SidebarCategory {
+                                            title: tree.name.to_string(),
+                                            id: tree.id.get(),
+                                            subcategories: tree.subcategories.iter().map(|s| (s.name.to_string(), s.id.get())).collect(),
+                                        }
+                                    }
+                                },
                             }
                         }
                     }
                 }
             }
+
             Outlet::<Route> {}
         }
     }

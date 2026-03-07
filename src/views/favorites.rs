@@ -1,26 +1,27 @@
 use crate::Route;
-use crate::components::product_card::ProductCard;
-use crate::fake_data::get_fake_products;
+use crate::components::ProductCard;
+use crate::database::products::ProductInfo as Product;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
+use rust_decimal::prelude::ToPrimitive;
 
+/// Favorites page.
 #[component]
-pub fn Favorites() -> Element {
+pub fn FavoritesPage() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
-    // TODO(db): Ersätt get_fake_products() med ett API-anrop
-    let products = get_fake_products();
 
-    // Filtrera data, de tillagda i favriter är de som syns!
-    // TODO(db): Favorit-ID:n ska sparas i databasen per användare istället för GlobalState
-    let fav_items: Vec<_> = products
-        .into_iter()
-        .filter(|p| global_state.read().favorites.contains(&p.id))
+    let favorites_ids = global_state.read().favorites.clone();
+
+    // TODO(db): Hämta riktiga produkter. Just nu en tom lista.
+    let all_products: Vec<Product> = vec![];
+
+    // Filtrera fram produkterna
+    let fav_items: Vec<_> = all_products
+        .iter()
+        .filter(|p| favorites_ids.contains(&p.id.get()))
         .collect();
-
     rsx! {
         div { class: "container mx-auto p-8",
-
-            // Knapp för att gå tillbaka till main page
             Link {
                 to: Route::Home {},
                 class: "text-green-700 hover:text-green-900 font-bold flex items-center gap-2 mb-4 transition-colors",
@@ -35,15 +36,15 @@ pub fn Favorites() -> Element {
                     p { class: "text-gray-500 text-xl", "Du har inga sparade produkter här!" }
                 }
             } else {
+                // GRID LÄGE
                 div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6",
                     for p in fav_items {
-                        // TODO(db): ProductCard är samma, bara datan ändras
                         ProductCard {
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            image_url: p.image_url,
-                            comparison_price: p.comparison_price,
+                            id: p.id.get(),
+                            name: p.name.clone(),
+                            price: p.price.to_f64().unwrap_or_default(),
+                            comparison_price: format!("{:.2} kr/{}", p.price, p.description),
+                            image_url: p.gallery.first().cloned().unwrap_or_default(),
                         }
                     }
                 }
