@@ -1,7 +1,10 @@
-//! Shared components.
+//! Shared UI components for boop
 
 mod navbar;
 pub use navbar::Navbar;
 
-mod product_card;
+pub mod product_card;
 pub use product_card::{ProductCard, ProductProps};
+
+pub mod auth_dropdown;
+pub use auth_dropdown::AuthDropdown;

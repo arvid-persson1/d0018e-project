@@ -1,14 +1,14 @@
 use dioxus::prelude::*;
-
-use crate::components::ProductCard;
-use crate::fake_data::get_fake_products;
+use crate::database::products::ProductInfo as Product;
+use crate::components::product_card::ProductCard;
+use rust_decimal::prelude::ToPrimitive;
 
 /// Home page..
 #[component]
 pub fn Home() -> Element {
     // TODO(db): Ersätt get_fake_products() med ett API-anrop
     // TODO(db): Lägg till paginering eller lazy-loading när produktmängd växer
-    let products = get_fake_products();
+    let products: Vec<Product> = vec![];
 
     rsx! {
         div { class: "min-h-screen bg-gray-50",
@@ -21,14 +21,13 @@ pub fn Home() -> Element {
                 div { class: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
 
                     // loopa genom produkterna som läggs till
-                    for p in products.iter() {
-                        // TODO(db): ProductCard är samma, bara datan ändras
+                    for p in products {
                         ProductCard {
-                            id: p.id,
+                            id: p.id.get(),
                             name: p.name.clone(),
-                            price: p.price,
-                            comparison_price: p.comparison_price.clone(),
-                            image_url: p.image_url.clone(),
+                            price: p.price.to_f64().unwrap_or_default(),
+                            comparison_price: format!("{:.2} kr", p.price),
+                            image_url: p.gallery.first().cloned().unwrap_or_default(),
                         }
                     }
                 }

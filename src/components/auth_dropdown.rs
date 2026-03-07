@@ -2,19 +2,19 @@ use dioxus::prelude::*;
 use crate::Route;
 
 // TODO(auth): Replace this entire component's logic with real auth state.
-// When auth is implemented:
-// 1. Add AuthState to GlobalState (or as its own context):
-//    pub struct AuthState { pub user: Option<LoggedInUser> }
-//    pub struct LoggedInUser { pub id: i32, pub username: String, pub role: UserRole }
-//    pub enum UserRole { Customer, Vendor, Administrator }
+// When auth:
+// Add AuthState to GlobalState (or as its own context):
+// pub struct AuthState { pub user: Option<LoggedInUser> }
+// pub struct LoggedInUser { pub id: i32, pub username: String, pub role: UserRole }
+// pub enum UserRole { Customer, Vendor, Administrator }
 //
-// 2. On app start, check session cookie/token:
-//    let session = use_resource(|| async { check_session().await });
+// App start:
+// let session = use_resource(|| async { check_session().await });
 //
-// 3. Login: POST credentials, get session token, store in AuthState
-// 4. Logout: DELETE session, clear AuthState
+// Login: POST credentials, get session token, store in AuthState
+// Logout: DELETE session, clear AuthState
 
-/// Dropdown shown when clicking the profile icon in the navbar.
+/// Dropdown shown when clicking the profile icon in the navbar
 #[component]
 pub fn AuthDropdown(on_close: EventHandler<()>) -> Element {
     // TODO(auth): Replace with: let auth = use_context::<Signal<AuthState>>();
