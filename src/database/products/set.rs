@@ -14,8 +14,6 @@ use {
 
 /// Create a new product.
 ///
-/// Note that `additions` contains [`String`]s, not [`Url`]s. This is due to a limitation in SQLx.
-///
 /// # Errors
 ///
 /// Fails if:
@@ -27,7 +25,7 @@ pub async fn create_product(
     vendor: Id<Vendor>,
     name: Box<str>,
     thumbnail: Url,
-    gallery: Box<[String]>,
+    gallery: Box<[Url]>,
     price: Decimal,
     overview: Box<str>,
     description: Box<str>,
@@ -42,14 +40,14 @@ pub async fn create_product(
             origin, category, amount_per_unit, measurement_unit
         )
         VALUES (
-            $1, $2, $3::TEXT, $4::TEXT[], $5::DECIMAL(10, 2), $6, $7,
+            $1, $2, $3, $4, $5::DECIMAL(10, 2), $6, $7,
             $8, $9, $10::DECIMAL(10, 2), $11
         )
         ",
         vendor.get(),
         &name,
-        &thumbnail,
-        &*gallery,
+        thumbnail as Url,
+        &*gallery as &[Url],
         price,
         &overview,
         &description,
@@ -99,11 +97,11 @@ pub async fn set_thumbnail(product: Id<Product>, url: Url) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET thumbnail = $2::TEXT
+        SET thumbnail = $2
         WHERE id = $1
         ",
         product.get(),
-        &url,
+        url as Url,
     )
     .execute(&*POOL)
     .await?
@@ -125,6 +123,7 @@ pub async fn gallery(product: Id<Product>) -> Result<Box<[Url]>> {
 
     query_as!(
         GalleryRepr,
+        // TODO: Can the explicit type be removed?
         r#"
         SELECT gallery AS "gallery: Vec<Url>"
         FROM products
@@ -140,23 +139,21 @@ pub async fn gallery(product: Id<Product>) -> Result<Box<[Url]>> {
 
 /// Set the gallery of a product.
 ///
-/// Note that `additions` contains [`String`]s, not [`Url`]s. This is due to a limitation in SQLx.
-///
 /// # Errors
 ///
 /// Fails if:
 /// - `product` is invalid.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn set_gallery(product: Id<Product>, gallery: Box<[String]>) -> Result<()> {
+pub async fn set_gallery(product: Id<Product>, gallery: Box<[Url]>) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET gallery = $2::TEXT[]
+        SET gallery = $2
         WHERE id = $1
         ",
         product.get(),
-        &*gallery,
+        &*gallery as &[Url],
     )
     .execute(&*POOL)
     .await?
@@ -165,23 +162,21 @@ pub async fn set_gallery(product: Id<Product>, gallery: Box<[String]>) -> Result
 
 /// Append to the gallery of a product.
 ///
-/// Note that `additions` contains [`String`]s, not [`Url`]s. This is due to a limitation in SQLx.
-///
 /// # Errors
 ///
 /// Fails if:
 /// - `product` is invalid.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn add_to_gallery(product: Id<Product>, additions: Box<[String]>) -> Result<()> {
+pub async fn add_to_gallery(product: Id<Product>, additions: Box<[Url]>) -> Result<()> {
     query!(
         "
         UPDATE products
-        SET gallery = gallery || $2::TEXT[]
+        SET gallery = gallery || $2
         WHERE id = $1
         ",
         product.get(),
-        &*additions,
+        &additions as &[Url],
     )
     .execute(&*POOL)
     .await?

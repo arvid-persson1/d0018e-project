@@ -3,6 +3,7 @@
 use nameof::name_of_type;
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::Borrow,
     fmt::{Debug, Display, Error as FmtError, Formatter},
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -28,53 +29,53 @@ pub type RawId = i32;
 /// associated [`Future`] completing.
 #[derive(Serialize, Deserialize)]
 // FIXME: `PhantomData` may be overly restrictive here when considering variance.
-pub struct Id<T: Key + ?Sized>(RawId, PhantomData<T>);
+pub struct Id<T: Key>(RawId, PhantomData<T>);
 
-impl<T: Key + ?Sized> Clone for Id<T> {
+impl<T: Key> Clone for Id<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: Key + ?Sized> Copy for Id<T> {}
+impl<T: Key> Copy for Id<T> {}
 
-impl<T: Key + ?Sized> PartialEq for Id<T> {
+impl<T: Key> PartialEq for Id<T> {
     fn eq(&self, other: &Self) -> bool {
         let Self(i, _) = self;
         *i == other.0
     }
 }
 
-impl<T: Key + ?Sized> Eq for Id<T> {}
+impl<T: Key> Eq for Id<T> {}
 
-impl<T: Key + ?Sized> Hash for Id<T> {
+impl<T: Key> Hash for Id<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let Self(i, _) = self;
         i.hash(state);
     }
 }
 
-impl<T: Key + ?Sized> Debug for Id<T> {
+impl<T: Key> Debug for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self(i, _) = self;
         f.debug_tuple(name_of_type!(Self)).field(i).finish()
     }
 }
 
-impl<T: Key + ?Sized> From<RawId> for Id<T> {
+impl<T: Key> From<RawId> for Id<T> {
     fn from(value: RawId) -> Self {
         Self(value, PhantomData)
     }
 }
 
-impl<T: Key + ?Sized> From<Id<T>> for RawId {
+impl<T: Key> From<Id<T>> for RawId {
     fn from(value: Id<T>) -> Self {
         let Id(i, _) = value;
         i
     }
 }
 
-impl<T: Key + ?Sized> Id<T> {
+impl<T: Key> Id<T> {
     /// Get the inner type-erased ID.
     ///
     /// This is equivalent to [`into`](Into::into), but with a known output type.
@@ -85,17 +86,23 @@ impl<T: Key + ?Sized> Id<T> {
     }
 }
 
-impl<T: Key + ?Sized> FromStr for Id<T> {
+impl<T: Key> FromStr for Id<T> {
     type Err = ParseIntError;
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         s.parse().map(|i| Self(i, PhantomData))
     }
 }
 
-impl<T: Key + ?Sized> Display for Id<T> {
+impl<T: Key> Display for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self(i, _) = self;
         write!(f, "{i}")
+    }
+}
+
+impl<T: Key> Borrow<RawId> for Id<T> {
+    fn borrow(&self) -> &RawId {
+        &self.0
     }
 }
 

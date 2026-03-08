@@ -158,6 +158,7 @@ pub async fn checkout(
     expected_offers: Option<Box<[Id<SpecialOffer>]>>,
 ) -> Result<()> {
     // This should be a no-op.
+    // TODO: Verify safety and transmute?
     let expected_offers =
         expected_offers.map(|ids| ids.into_iter().map(Id::get).collect::<Box<_>>());
     query!(

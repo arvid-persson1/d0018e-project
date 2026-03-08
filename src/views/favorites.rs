@@ -44,7 +44,7 @@ pub fn FavoritesPage() -> Element {
                             name: p.name.clone(),
                             price: p.price.to_f64().unwrap_or_default(),
                             comparison_price: format!("{:.2} kr/{}", p.price, p.description),
-                            image_url: p.gallery.first().cloned().unwrap_or_default(),
+                            image_url: p.gallery.first().cloned().unwrap(),
                         }
                     }
                 }

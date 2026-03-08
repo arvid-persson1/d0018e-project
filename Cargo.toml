@@ -25,12 +25,7 @@ hashbrown = { default-features = false, features = [
 ], version = "0.16.1" }
 http = { default-features = false, features = ["std"], optional = true, version = "1.4.0" }
 nameof = "1.3.0"
-regex = { default-features = false, features = [
-    "perf",
-    "perf-dfa-full",
-    "std",
-    "unicode-gencat",
-], version = "1.12.2" }
+regex = { default-features = false, features = ["perf", "perf-dfa-full", "std", "unicode-gencat", "unicode-perl"], version = "1.12.2" }
 rust_decimal = { default-features = false, features = ["serde", "std"], version = "1.40.0" }
 serde = { default-features = false, features = ["alloc", "derive", "std"], version = "1.0.228" }
 sqlx = { default-features = false, features = [

@@ -40,11 +40,11 @@ pub async fn set_customer_profile_picture(customer: Id<Customer>, url: Url) -> R
     query!(
         "
         UPDATE customers
-        SET profile_picture = $2::TEXT
+        SET profile_picture = $2
         WHERE id = $1
         ",
         customer.get(),
-        &url,
+        url as Url,
     )
     .execute(&*POOL)
     .await?
@@ -63,11 +63,11 @@ pub async fn set_vendor_profile_picture(vendor: Id<Vendor>, url: Url) -> Result<
     query!(
         "
         UPDATE vendors
-        SET profile_picture = $2::TEXT
+        SET profile_picture = $2
         WHERE id = $1
         ",
         vendor.get(),
-        &url,
+        url as Url,
     )
     .execute(&*POOL)
     .await?
@@ -87,11 +87,11 @@ pub async fn set_username(user: Id<User>, username: Username) -> Result<()> {
     query!(
         "
         UPDATE users
-        SET username = $2::TEXT
+        SET username = $2
         WHERE id = $1
         ",
         user.get(),
-        &*username,
+        username as Username,
     )
     .execute(&*POOL)
     .await?
@@ -115,7 +115,7 @@ pub async fn set_email(user: Id<User>, email: Email) -> Result<()> {
         WHERE id = $1
         ",
         user.get(),
-        &*email,
+        &email,
     )
     .execute(&*POOL)
     .await?

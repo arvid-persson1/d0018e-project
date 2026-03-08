@@ -1,6 +1,6 @@
 //! Types produced by database operations.
 
-use derive_more::{Deref, Display, Into};
+use derive_more::{Deref, Display, From, Into};
 use regex::Regex;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -14,8 +14,20 @@ use std::{
 };
 use thiserror::Error;
 
-/// URL to an external resource, owned.
-pub type Url = Box<str>;
+/// URL to an external resource.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Display, From, Into, Deref,
+)]
+#[repr(transparent)]
+#[cfg_attr(feature = "server", derive(Type))]
+#[cfg_attr(feature = "server", sqlx(transparent))]
+pub struct Url(pub Box<str>);
+
+impl From<String> for Url {
+    fn from(value: String) -> Self {
+        Self(value.into())
+    }
+}
 
 /// Quantity of a product, possibly along with unit, e.g. "4.2 kg" or "8.15 dl".
 ///
@@ -248,6 +260,8 @@ impl Display for AverageRating {
 )]
 // TODO: Derive `Deserialize` manually, disallowing invalid values.
 #[repr(transparent)]
+#[cfg_attr(feature = "server", derive(Type))]
+#[cfg_attr(feature = "server", sqlx(transparent))]
 pub struct Username(Box<str>);
 
 impl Username {
@@ -270,6 +284,8 @@ impl Username {
 )]
 // TODO: Derive `Deserialize` manually, disallowing invalid values.
 #[repr(transparent)]
+#[cfg_attr(feature = "server", derive(Type))]
+#[cfg_attr(feature = "server", sqlx(transparent))]
 pub struct Email(Box<str>);
 
 impl Email {
@@ -318,7 +334,7 @@ impl ProfilePicture {
     #[must_use]
     pub fn url(&self) -> &str {
         let Self(url) = self;
-        url.as_deref().unwrap_or(ADMIN_PROFILE_PICTURE)
+        url.as_deref().map_or(ADMIN_PROFILE_PICTURE, |x| x)
     }
 }
 
@@ -388,11 +404,11 @@ impl Deal {
         quantity2: Option<i32>,
         base_price: Decimal,
     ) -> Result<Option<Self>, DealError> {
-        const ONE: NonZeroU32 = NonZero::new(1).unwrap();
-
         if base_price <= Decimal::ZERO {
             return Err(DealError::ZeroPrice);
         }
+
+        const ONE: NonZeroU32 = NonZero::new(1).unwrap();
 
         match (new_price, quantity1, quantity2) {
             (Some(new_price), None, None) => {

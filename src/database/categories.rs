@@ -126,7 +126,7 @@ pub async fn create_category(parent: Option<Id<Category>>, name: Box<str>) -> Re
         VALUES ($1, $2)
         ",
         parent.map(Id::get),
-        &name
+        &name,
     )
     .execute(&*POOL)
     .await
