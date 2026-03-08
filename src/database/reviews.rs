@@ -1,15 +1,15 @@
 //! Database functions to interact with reviews and comments.
 
 use crate::database::{
-    Comment, Customer, Id, Product, ProfilePicture, Rating, Review, Url, User, Username, Vendor,
-    Vote,
+    Comment, Customer, Id, Product, ProfilePicture, Rating, Review, Role, Url, User, Username, Vote,
 };
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{POOL, QueryResultExt, RawId},
+    crate::database::{POOL, QueryResultExt, RawId, build_pfp},
+    hashbrown::HashMap,
     sqlx::{query, query_as},
     std::cmp::Reverse,
     tokio::task::spawn,
@@ -73,10 +73,17 @@ pub struct OwnReview {
 pub struct CommentTree {
     /// The ID of the comment.
     pub id: Id<Comment>,
+    /// The ID of the author.
+    pub user_id: Id<User>,
     /// The username of the author.
     pub username: Username,
-    /// The role of the author, see [`CommentRole`] for details.
-    pub role: CommentRole,
+    /// The role of the author. In certain cases, a badge should be displayed on the comment:
+    /// - If the user (a customer) is the original poster of the review.
+    /// - If the user (a vendor) is the owner of the product.
+    /// - If the user is an administrator.
+    pub role: Role,
+    /// The profile picture of the authoring customer.
+    pub profile_picture: ProfilePicture,
     /// The content of the comment.
     pub content: Box<str>,
     /// When the comment was created.
@@ -89,25 +96,6 @@ pub struct CommentTree {
     pub own_vote: Option<Vote>,
     /// All direct replies to the comment.
     pub replies: Vec<Self>,
-}
-
-/// The role of the user placing a comment, to determine whether a special badge should be
-/// displayed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[expect(
-    variant_size_differences,
-    reason = "Difference is negligible and these are not intended to be stored in large quantities."
-)]
-pub enum CommentRole {
-    /// The author is a user. The author of the review should get a badge.
-    User {
-        /// Whether the user is the original poster of the review.
-        author: bool,
-    },
-    /// The user is a vendor (ID provided). The owner of the product should get a badge.
-    Vendor(Id<Vendor>),
-    /// The user is a site administrator. Administrators should always get a badge.
-    Administrator,
 }
 
 #[cfg(feature = "server")]
@@ -125,52 +113,53 @@ struct ReviewRepr {
 }
 
 #[cfg(feature = "server")]
-impl From<ReviewRepr> for ProductReview {
-    fn from(
-        ReviewRepr {
-            id,
-            customer,
-            username,
-            profile_picture,
-            rating,
-            created_at,
-            updated_at,
-            title,
-            content,
-            sum_votes,
-        }: ReviewRepr,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            customer: customer.into(),
-            username: Username::new(username.into()).expect("Invalid username."),
-            profile_picture: ProfilePicture::new(profile_picture.into()),
-            rating: Rating::new(rating as u8).expect("Invalid rating."),
-            created_at,
-            updated_at,
-            title: title.into(),
-            content: content.into(),
-            comments: Vec::new(),
-            sum_votes,
-            own_vote: None,
-        }
-    }
-}
-
-#[cfg(feature = "server")]
-#[expect(dead_code, reason = "TODO")]
 struct CommentRepr {
     id: RawId,
     parent: Option<RawId>,
     review: RawId,
     user_id: RawId,
     username: String,
-    customer_pfp: Option<String>,
-    vendor_pfp: Option<String>,
     content: String,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
     sum_votes: i64,
+    // Fetched separately to identify role.
+    customer_pfp: Option<String>,
+    vendor_pfp: Option<String>,
+}
+
+#[cfg(feature = "server")]
+impl From<CommentRepr> for CommentTree {
+    fn from(
+        CommentRepr {
+            id,
+            parent: _,
+            review: _,
+            user_id,
+            username,
+            customer_pfp,
+            vendor_pfp,
+            content,
+            created_at,
+            updated_at,
+            sum_votes,
+        }: CommentRepr,
+    ) -> Self {
+        let (role, profile_picture) = build_pfp(customer_pfp, vendor_pfp);
+        Self {
+            id: id.into(),
+            user_id: user_id.into(),
+            username: Username::new(username.into()).expect("Invalid username."),
+            role,
+            profile_picture,
+            content: content.into(),
+            created_at,
+            updated_at,
+            sum_votes,
+            own_vote: None,
+            replies: Vec::new(),
+        }
+    }
 }
 
 #[cfg(feature = "server")]
@@ -182,32 +171,6 @@ struct OwnReviewRepr {
     title: String,
     content: String,
     sum_votes: i64,
-}
-
-#[cfg(feature = "server")]
-impl From<OwnReviewRepr> for OwnReview {
-    fn from(
-        OwnReviewRepr {
-            id,
-            rating,
-            created_at,
-            updated_at,
-            title,
-            content,
-            sum_votes,
-        }: OwnReviewRepr,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            rating: Rating::new(rating as u8).expect("Invalid rating."),
-            created_at,
-            updated_at,
-            title: title.into(),
-            content: content.into(),
-            comments: Vec::new(),
-            sum_votes,
-        }
-    }
 }
 
 #[cfg(feature = "server")]
@@ -260,7 +223,6 @@ impl From<OtherReviewRepr> for ProductReview {
 }
 
 #[cfg(feature = "server")]
-#[expect(dead_code, reason = "TODO")]
 struct CommentReprCustomer {
     id: RawId,
     parent: Option<RawId>,
@@ -277,6 +239,57 @@ struct CommentReprCustomer {
     vendor_pfp: Option<String>,
 }
 
+#[cfg(feature = "server")]
+impl From<CommentReprCustomer> for CommentTree {
+    fn from(
+        CommentReprCustomer {
+            id,
+            parent: _,
+            review: _,
+            user_id,
+            username,
+            customer_pfp,
+            vendor_pfp,
+            content,
+            sum_votes,
+            own_vote,
+            created_at,
+            updated_at,
+        }: CommentReprCustomer,
+    ) -> Self {
+        let (role, profile_picture) = build_pfp(customer_pfp, vendor_pfp);
+        Self {
+            id: id.into(),
+            user_id: user_id.into(),
+            username: Username::new(username.into()).expect("Invalid username."),
+            role,
+            profile_picture,
+            content: content.into(),
+            created_at,
+            updated_at,
+            sum_votes,
+            own_vote,
+            replies: Vec::new(),
+        }
+    }
+}
+
+#[cfg(feature = "server")]
+fn build_tree(
+    root: CommentTree,
+    by_parent: &mut HashMap<Id<Comment>, Vec<CommentTree>>,
+) -> CommentTree {
+    CommentTree {
+        replies: by_parent
+            .remove(&root.id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|comment| build_tree(comment, by_parent))
+            .collect(),
+        ..root
+    }
+}
+
 /// Get reviews and associated comments for a product sorted by score, for display on product
 /// pages.
 ///
@@ -288,8 +301,6 @@ struct CommentReprCustomer {
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
 #[server]
-#[expect(unused_mut, reason = "TODO")]
-#[expect(unused_variables, reason = "TODO")]
 #[expect(
     clippy::missing_panics_doc,
     reason = "Database validation and correctness checks only."
@@ -321,7 +332,7 @@ pub async fn product_reviews(
         LEFT JOIN review_votes ON review = r.id
         WHERE r.product = $1
         GROUP BY r.id, username, profile_picture, rating
-        ORDER BY "sum_votes!" DESC
+        ORDER BY "sum_votes!" DESC, created_at
         LIMIT $2
         OFFSET $3
         "#,
@@ -348,7 +359,7 @@ pub async fn product_reviews(
         LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($1)
         GROUP BY c.id, username, customer_pfp, vendor_pfp
-        ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
+        ORDER BY parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         &*reviews
             .iter()
@@ -362,23 +373,76 @@ pub async fn product_reviews(
     // success path.
     let commit = spawn(tx.commit());
 
-    // TODO: After missing implementation below, can replace this call with more general
-    // `Into::into` and remove type hints.
-    let mut reviews = reviews
+    let mut comment_roots = Vec::new();
+    let mut replies_by_parent = HashMap::<_, Vec<_>>::new();
+    let mut iter = comments.into_iter().peekable();
+
+    while let Some(comment) = iter.next_if(|comment| comment.parent.is_none()) {
+        comment_roots.push((Id::<Review>::from(comment.review), comment.into()));
+    }
+
+    for comment in iter {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "Nodes without parents have already been traversed in the previous loop."
+        )]
+        replies_by_parent
+            .entry(comment.parent.unwrap().into())
+            .or_default()
+            .push(comment.into());
+    }
+
+    let mut comment_trees = comment_roots
         .into_iter()
-        .map(Into::<ProductReview>::into)
+        .map(|(review, comment)| (review, build_tree(comment, &mut replies_by_parent)))
+        .fold(HashMap::<_, Vec<_>>::new(), |mut acc, (review, comment)| {
+            acc.entry(review).or_default().push(comment);
+            acc
+        });
+
+    let reviews = reviews
+        .into_iter()
+        .map(
+            |ReviewRepr {
+                 id,
+                 customer,
+                 username,
+                 profile_picture,
+                 rating,
+                 created_at,
+                 updated_at,
+                 title,
+                 content,
+                 sum_votes,
+             }| {
+                ProductReview {
+                    id: id.into(),
+                    customer: customer.into(),
+                    username: Username::new(username.into()).expect("Invalid username."),
+                    profile_picture: ProfilePicture::new(profile_picture.into()),
+                    rating: Rating::new(rating as u8).expect("Invalid rating."),
+                    created_at,
+                    updated_at,
+                    title: title.into(),
+                    content: content.into(),
+                    comments: comment_trees.remove(&id).unwrap_or_default(),
+                    sum_votes,
+                    own_vote: None,
+                }
+            },
+        )
         .collect::<Box<_>>();
 
-    // TODO: Construct comment trees, attach them to reviews.
-    eprintln!("Comment trees unimplemented.");
-
+    debug_assert!(comment_trees.is_empty(), "Orphaned comment trees.");
     debug_assert!(
         {
             fn comments_sorted(comments: &[CommentTree]) -> bool {
                 comments.is_sorted_by_key(|c| (Reverse(c.sum_votes), c.created_at))
-                    && comments.iter().all(|c| comments_sorted(&c.replies))
+                    & comments.iter().all(|c| comments_sorted(&c.replies))
             }
-            reviews.iter().all(|r| comments_sorted(&r.comments))
+            reviews
+                .iter()
+                .all(|review| comments_sorted(&review.comments))
         },
         "Comments not sorted."
     );
@@ -401,20 +465,17 @@ pub async fn product_reviews(
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
 #[server]
-#[expect(unused_mut, reason = "TODO")]
-#[expect(unused_variables, reason = "TODO")]
 #[expect(
     clippy::missing_panics_doc,
     reason = "Database validation and correctness checks only."
 )]
-#[allow(clippy::too_many_lines, reason = "Complex query function")]
 pub async fn product_reviews_as(
     customer: Id<Customer>,
     product: Id<Product>,
     limit: usize,
     offset: usize,
 ) -> Result<(Option<OwnReview>, Box<[ProductReview]>)> {
-    // Own review is fetched separately from usual limit.
+    // Own review is excluded from the limit.
     let mut review_ids = Vec::with_capacity(limit + 1);
 
     let mut tx = POOL
@@ -465,7 +526,7 @@ pub async fn product_reviews_as(
         LEFT JOIN review_votes ON review = r.id
         WHERE r.product = $2 AND r.customer != $1
         GROUP BY r.id, username, profile_picture, rating
-        ORDER BY "sum_votes!" DESC
+        ORDER BY "sum_votes!" DESC, created_at
         LIMIT $3
         OFFSET $4
         "#,
@@ -513,28 +574,99 @@ pub async fn product_reviews_as(
     // success path.
     let commit = spawn(tx.commit());
 
-    // TODO: After missing implementation below, can replace this call with more general
-    // `Into::into`.
-    let own_review = own_review.map(Into::<OwnReview>::into);
+    let mut comment_roots = Vec::new();
+    let mut replies_by_parent = HashMap::<_, Vec<_>>::new();
+    let mut iter = comments.into_iter().peekable();
 
-    let mut other_reviews = other_reviews
+    while let Some(comment) = iter.next_if(|comment| comment.parent.is_none()) {
+        comment_roots.push((Id::<Review>::from(comment.review), comment.into()));
+    }
+
+    for comment in iter {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "Nodes without parents have already been traversed in the previous loop."
+        )]
+        replies_by_parent
+            .entry(comment.parent.unwrap().into())
+            .or_default()
+            .push(comment.into());
+    }
+
+    let mut comment_trees = comment_roots
         .into_iter()
-        .map(Into::<ProductReview>::into)
+        .map(|(review, comment)| (review, build_tree(comment, &mut replies_by_parent)))
+        .fold(HashMap::<_, Vec<_>>::new(), |mut acc, (review, comment)| {
+            acc.entry(review).or_default().push(comment);
+            acc
+        });
+
+    let own_review = own_review.map(
+        |OwnReviewRepr {
+             id,
+             rating,
+             created_at,
+             updated_at,
+             title,
+             content,
+             sum_votes,
+         }| OwnReview {
+            id: id.into(),
+            rating: Rating::new(rating as u8).expect("Invalid rating."),
+            created_at,
+            updated_at,
+            title: title.into(),
+            content: content.into(),
+            comments: comment_trees.remove(&id).unwrap_or_default(),
+            sum_votes,
+        },
+    );
+
+    let other_reviews = other_reviews
+        .into_iter()
+        .map(
+            |OtherReviewRepr {
+                 id,
+                 customer,
+                 username,
+                 profile_picture,
+                 rating,
+                 created_at,
+                 updated_at,
+                 title,
+                 content,
+                 sum_votes,
+                 own_vote,
+             }| {
+                ProductReview {
+                    id: id.into(),
+                    customer: customer.into(),
+                    username: Username::new(username.into()).expect("Invalid username."),
+                    profile_picture: ProfilePicture::new(profile_picture.into()),
+                    rating: Rating::new(rating as u8).expect("Invalid rating."),
+                    created_at,
+                    updated_at,
+                    title: title.into(),
+                    content: content.into(),
+                    comments: comment_trees.remove(&id).unwrap_or_default(),
+                    sum_votes,
+                    own_vote,
+                }
+            },
+        )
         .collect::<Box<_>>();
 
-    // TODO: Construct comment trees, attach them to reviews.
-    eprintln!("Comment trees unimplemented.");
-
+    debug_assert!(comment_trees.is_empty(), "Orphaned comment trees.");
     debug_assert!(
         {
             fn comments_sorted(comments: &[CommentTree]) -> bool {
                 comments.is_sorted_by_key(|c| (Reverse(c.sum_votes), c.created_at))
-                    && comments.iter().all(|c| comments_sorted(&c.replies))
+                    & comments.iter().all(|c| comments_sorted(&c.replies))
             }
             own_review
                 .as_ref()
                 .is_none_or(|r| comments_sorted(&r.comments))
-                && other_reviews.iter().all(|r| comments_sorted(&r.comments))
+                & other_reviews.iter().all(|r| comments_sorted(&r.comments))
         },
         "Comments not sorted."
     );
