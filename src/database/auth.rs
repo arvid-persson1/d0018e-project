@@ -76,21 +76,21 @@ pub async fn create_user(
     let password_hash = hash_password(&password, (&SaltString::generate(OsRng)).into())
         .unwrap()
         .serialize();
+
+    // #[derive(Type)]
+    // struct PhcString<'a>(&'a str);
+    // let password_hash = PhcString(password_hash.as_str());
+
+    // HACK: `password_hash` Must be `PHC_STRING` for the call to resolve to the correct procedure,
+    // but must be `TEXT` to coerce to the domain type.
     match data {
         NewUserData::Customer { profile_picture } => {
             query!(
-                "
-                WITH customer AS (
-                    INSERT INTO customers (profile_picture)
-                    VALUES ($4::TEXT)
-                )
-                INSERT INTO users (username, email, password_hash)
-                VALUES ($1::TEXT, $2::TEXT, $3::TEXT)
-                ",
-                &*username,
-                &*email,
-                password_hash.as_ref(),
-                &profile_picture,
+                "CALL create_customer($1, $2, ($3::TEXT)::PHC_STRING, $4)",
+                username as Username,
+                email as Email,
+                password_hash.as_str(),
+                profile_picture as Url,
             )
         },
         NewUserData::Vendor {
@@ -99,31 +99,21 @@ pub async fn create_user(
             description,
         } => {
             query!(
-                "
-                WITH vendor AS (
-                    INSERT INTO vendors (profile_picture, display_name, description)
-                    VALUES ($4::TEXT, $5, $6)
-                )
-                INSERT INTO users (username, email, password_hash)
-                VALUES ($1::TEXT, $2::TEXT, $3::TEXT)
-                ",
-                &*username,
-                &*email,
-                password_hash.as_ref(),
-                &profile_picture,
+                "CALL create_vendor($1, $2, ($3::TEXT)::PHC_STRING, $4, $5, $6)",
+                username as Username,
+                email as Email,
+                password_hash.as_str(),
+                profile_picture as Url,
                 &display_name,
                 &description,
             )
         },
         NewUserData::Administrator => {
             query!(
-                "
-                INSERT INTO users (username, email, password_hash)
-                VALUES ($1::TEXT, $2::TEXT, $3::TEXT)
-                ",
-                &*username,
-                &*email,
-                password_hash.as_ref(),
+                "CALL create_administrator($1, $2, ($3::TEXT)::PHC_STRING)",
+                username as Username,
+                email as Email,
+                password_hash.as_str(),
             )
         },
     }
@@ -146,7 +136,7 @@ pub async fn log_in(username: Username, password: Box<str>) -> Result<Response> 
         FROM users
         WHERE username = $1
         ",
-        &*username,
+        &username,
     )
     .fetch_optional(&*POOL)
     .await?
