@@ -405,7 +405,7 @@ impl Deal {
         base_price: Decimal,
     ) -> Result<Option<Self>, DealError> {
         if base_price <= Decimal::ZERO {
-            return Err(DealError::ZeroPrice);
+            return Err(DealError::InvalidPrice);
         }
 
         const ONE: NonZeroU32 = NonZero::new(1).unwrap();
@@ -432,7 +432,7 @@ impl Deal {
                 }
             },
             (Some(pay), Some(take), None) => {
-                if pay * Decimal::from(take) >= base_price {
+                if pay >= base_price * Decimal::from(take) {
                     Err(DealError::NoDiscount)
                 } else if let Some(take) = u32::try_from(take).ok().and_then(NonZeroU32::new) {
                     Ok(Some(Self(if take == ONE {
@@ -463,15 +463,19 @@ impl Deal {
         match deal {
             DealImpl::Discount { new_price } => Some((Some(new_price), None, None)),
             DealImpl::Batch { take, pay_for } => {
-                match (take.get().try_into(), pay_for.get().try_into()) {
-                    (Ok(take), Ok(pay_for)) => Some((None, Some(take), Some(pay_for))),
-                    _ => None,
+                if let Ok(take) = take.get().try_into()
+                    && let Ok(pay_for) = pay_for.get().try_into()
+                {
+                    Some((None, Some(take), Some(pay_for)))
+                } else {
+                    None
                 }
             },
-            DealImpl::BatchPrice { take, pay } => match take.get().try_into() {
-                Ok(take) => Some((Some(pay), Some(take), None)),
-                _ => None,
-            },
+            DealImpl::BatchPrice { take, pay } => take
+                .get()
+                .try_into()
+                .ok()
+                .map(|take| (Some(pay), Some(take), None)),
         }
     }
 
@@ -561,9 +565,9 @@ enum DealImpl {
 /// Errors created by methods of [`Deal`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum DealError {
-    /// The provided base price was 0.
+    /// The provided base price was non-positive.
     #[error("Base price must be positive.")]
-    ZeroPrice,
+    InvalidPrice,
     /// The new price or a quantity was non-positive. The new price may be 0 only if both
     /// quantities are [`None`].
     #[error("New price and quantities must be positive.")]
