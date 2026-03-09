@@ -91,6 +91,17 @@ impl Amount {
     pub fn unit(&self) -> Option<&str> {
         self.unit.as_deref()
     }
+
+    /// Construct an [`Amount`] from its representation in the database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the values do not uphold any of the database's invariants.
+    #[cfg(feature = "server")]
+    pub(super) fn from_repr(amount_per_unit: Decimal, measurement_unit: Option<String>) -> Self {
+        Self::new(amount_per_unit, measurement_unit.map(Into::into))
+            .expect("Database returned invalid amount.")
+    }
 }
 
 impl PartialOrd for Amount {
@@ -222,6 +233,29 @@ impl AverageRating {
     pub const fn count(self) -> u64 {
         self.count
     }
+
+    /// Construct an [`AverageRating`] from its representation in the database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the values do not uphold any of the database's invariants.
+    #[cfg(feature = "server")]
+    #[expect(clippy::unreachable, reason = "Database validation only.")]
+    pub(super) fn from_repr(average_rating: Option<f64>, rating_count: i64) -> Self {
+        match (average_rating, rating_count) {
+            (None, 0) => Self::default(),
+            (Some(_), 0) | (None, _) => {
+                unreachable!("Database returned inconsistent average rating data.")
+            },
+            (Some(average_rating), rating_count) => Self::new(
+                average_rating,
+                rating_count
+                    .try_into()
+                    .expect("Database returned negative rating count."),
+            )
+            .expect("Database returned invalid average rating."),
+        }
+    }
 }
 
 impl From<Rating> for AverageRating {
@@ -299,42 +333,65 @@ impl Email {
     }
 }
 
-/// URL to the profile picture all admins use.
-pub const ADMIN_PROFILE_PICTURE: &str = "";
-
 /// A user's profile picture.
 ///
 /// Customers and vendors can set their own profile pictures, while admins always have the same
 /// fixed one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(transparent)]
-pub struct ProfilePicture(Option<Url>);
+pub enum ProfilePicture {
+    /// A customer's profile picture.
+    Customer(Option<Url>),
+    /// A vendor's profile picture.
+    Vendor(Option<Url>),
+    /// The standard administrator profile picture.
+    Administrator,
+}
 
 impl ProfilePicture {
-    /// Construct a new `ProfilePicture` for a customer or vendor from a URL.
-    #[must_use]
-    pub const fn new(url: Url) -> Self {
-        Self(Some(url))
+    // TODO: Replace placeholders.
+
+    /// URL to the default profile picture for customers.
+    pub const CUSTOMER_DEFAULT: &str =
+        "https://freerangestock.com/sample/119157/business-man-profile-vector.jpg";
+
+    /// URL to the default profile picture for vendors.
+    pub const VENDOR_DEFAULT: &str =
+        "https://freerangestock.com/sample/119157/business-man-profile-vector.jpg";
+
+    /// URL to the profile picture all admins use.
+    pub const ADMIN: &str =
+        "https://freerangestock.com/sample/119157/business-man-profile-vector.jpg";
+
+    #[cfg(feature = "server")]
+    pub(super) fn from_repr(url: Option<String>, role: Role) -> Self {
+        match (url, role) {
+            (url, Role::Customer) => Self::Customer(url.map(Into::into)),
+            (url, Role::Vendor) => Self::Vendor(url.map(Into::into)),
+            (None, Role::Administrator) => Self::Administrator,
+            (Some(_), Role::Administrator) => {
+                unreachable!("Database returned inconsistent profile picture data.")
+            },
+        }
     }
 
-    /// Construct a new `ProfilePicture` for an administrator.
-    #[must_use]
-    pub const fn admin() -> Self {
-        Self(None)
-    }
-
-    /// Get whether the profile picture is [`ADMIN_PROFILE_PICTURE`].
-    #[must_use]
-    pub const fn is_admin(&self) -> bool {
-        let Self(url) = self;
-        url.is_none()
-    }
-
-    /// Returns the URL to the profile picture.
+    /// Get the URL to the profile picture.
     #[must_use]
     pub fn url(&self) -> &str {
-        let Self(url) = self;
-        url.as_deref().map_or(ADMIN_PROFILE_PICTURE, |x| x)
+        match self {
+            Self::Customer(Some(url)) | Self::Vendor(Some(url)) => &**url,
+            Self::Customer(None) => Self::CUSTOMER_DEFAULT,
+            Self::Vendor(None) => Self::VENDOR_DEFAULT,
+            Self::Administrator => Self::ADMIN,
+        }
+    }
+
+    /// Get the role of the user associated with the profile picture.
+    pub const fn role(&self) -> Role {
+        match self {
+            Self::Customer(_) => Role::Customer,
+            Self::Vendor(_) => Role::Vendor,
+            Self::Administrator => Role::Administrator,
+        }
     }
 }
 

@@ -8,7 +8,7 @@ use dioxus_fullstack::response::Response;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use {
-    crate::database::{POOL, QueryResultExt, build_pfp},
+    crate::database::{POOL, QueryResultExt},
     argon2::{
         Argon2, PasswordHasher as _, PasswordVerifier as _,
         password_hash::{
@@ -164,8 +164,8 @@ pub async fn log_out() -> Result<Response> {
 #[cfg(feature = "server")]
 struct LoginRepr {
     username: String,
-    customer_pfp: Option<String>,
-    vendor_pfp: Option<String>,
+    role: Role,
+    profile_picture: Option<String>,
 }
 
 #[cfg(feature = "server")]
@@ -174,15 +174,14 @@ impl Login {
         id: Id<User>,
         LoginRepr {
             username,
-            customer_pfp,
-            vendor_pfp,
+            role,
+            profile_picture,
         }: LoginRepr,
     ) -> Self {
-        let (role, profile_picture) = build_pfp(customer_pfp, vendor_pfp);
         Self {
             id: LoginId::classify(id, role),
             username: Username::new(username.into()).expect("Invalid username."),
-            profile_picture,
+            profile_picture: ProfilePicture::from_repr(profile_picture, role),
         }
     }
 }
@@ -191,12 +190,15 @@ impl Login {
 pub async fn login_info(user: Id<User>) -> Result<Login> {
     query_as!(
         LoginRepr,
-        "
-        SELECT username, c.profile_picture AS customer_pfp, v.profile_picture AS vendor_pfp
-        FROM users
-        LEFT JOIN customers c ON c.id = $1
-        LEFT JOIN vendors v ON v.id = $1
-        ",
+        r#"
+        SELECT username,
+            role_of(u.id) AS "role!: Role",
+            COALESCE(c.profile_picture, v.profile_picture) AS profile_picture
+        FROM users u
+        LEFT JOIN customers c ON c.id = u.id
+        LEFT JOIN vendors v ON v.id = u.id
+        WHERE u.id = $1
+        "#,
         user.get(),
     )
     .fetch_one(&*POOL)
@@ -208,12 +210,19 @@ pub async fn login_info(user: Id<User>) -> Result<Login> {
 /// Information about a login session.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Login {
-    /// The ID of the logged in user.
+    /// The ID of the logged-in user.
     pub id: LoginId,
-    /// The username of the logged in user.
+    /// The username of the logged-in user.
     pub username: Username,
-    /// The profile picture of the logged in user.
+    /// The profile picture of the logged-in user.
     pub profile_picture: ProfilePicture,
+}
+
+impl Login {
+    /// Get the role of the logged-in user.
+    pub const fn role(&self) -> Role {
+        self.profile_picture.role()
+    }
 }
 
 /// A user's role and their ID.

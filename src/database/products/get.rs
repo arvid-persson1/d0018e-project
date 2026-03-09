@@ -7,10 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
 #[cfg(feature = "server")]
 use {
-    crate::database::{
-        POOL, RawId,
-        products::{build_amount, try_build_special_offer},
-    },
+    crate::database::{POOL, RawId},
     sqlx::query_as,
     std::cmp::Reverse,
 };
@@ -37,9 +34,11 @@ pub struct ProductOverview {
     pub vendor_name: Box<str>,
     /// The origin of the product. This may or may not be the name of a country.
     pub origin: Box<str>,
-    /// The currently active special offer on the product if any, and whether it only applies to
-    /// members.
-    pub special_offer: Option<(Deal, bool)>,
+    /// The currently active special offer on the product, if any.
+    pub special_offer_deal: Option<Deal>,
+    /// Whether the special offer only applies to members. Value is unspecified if
+    /// `special_offer_deal` is `None`.
+    pub special_offer_members_only: bool,
     /// Whether the customer has marked the product as a favorite. Value is unspecified if a
     /// customer ID was not provided.
     pub favorited: bool,
@@ -96,9 +95,11 @@ pub struct ProductOverviewVendor {
     pub amount_per_unit: Amount,
     /// The origin of the product. This may or may not be the name of a country.
     pub origin: Box<str>,
-    /// The currently active special offer on the product if any, and whether it only applies to
-    /// members.
-    pub special_offer: Option<(Deal, bool)>,
+    /// The currently active special offer on the product, if any.
+    pub special_offer_deal: Option<Deal>,
+    /// Whether the special offer only applies to members. Value is unspecified if
+    /// `special_offer_deal` is `None`.
+    pub special_offer_members_only: bool,
     /// Whether the customer has marked the product as a favorite. Value is unspecified if a
     /// customer ID was not provided.
     pub favorited: bool,
@@ -126,9 +127,11 @@ pub struct ProductOverviewFavorited {
     pub vendor_name: Box<str>,
     /// The origin of the product. This may or may not be the name of a country.
     pub origin: Box<str>,
-    /// The currently active special offer on the product if any, and whether it only applies to
-    /// members.
-    pub special_offer: Option<(Deal, bool)>,
+    /// The currently active special offer on the product, if any.
+    pub special_offer_deal: Option<Deal>,
+    /// Whether the special offer only applies to members. Value is unspecified if
+    /// `special_offer_deal` is `None`.
+    pub special_offer_members_only: bool,
 }
 
 #[cfg(feature = "server")]
@@ -145,7 +148,7 @@ struct ProductRepr {
     new_price: Option<Decimal>,
     quantity1: Option<i32>,
     quantity2: Option<i32>,
-    members_only: Option<bool>,
+    members_only: bool,
     vendor_name: String,
     favorited: bool,
 }
@@ -178,19 +181,15 @@ impl From<ProductRepr> for ProductOverview {
             price,
             overview: overview.into(),
             in_stock: u32::try_from(in_stock)
-                .expect("Database returned negative stock.")
-                .try_into()
-                .expect("Database returnd product with no stock."),
-            amount_per_unit: build_amount(amount_per_unit, measurement_unit),
+                .ok()
+                .and_then(|in_stock| in_stock.try_into().ok())
+                .expect("Database returned non-positive stock."),
+            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             vendor_name: vendor_name.into(),
             origin: origin.into(),
-            special_offer: try_build_special_offer(
-                new_price,
-                quantity1,
-                quantity2,
-                members_only,
-                price,
-            ),
+            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
+                .expect("Database returned invalid special offer."),
+            special_offer_members_only: members_only,
             favorited,
         }
     }
@@ -243,10 +242,10 @@ impl From<ProductReprDiscounted> for ProductOverviewDiscounted {
             price,
             overview: overview.into(),
             in_stock: u32::try_from(in_stock)
-                .expect("Database returned negative stock.")
-                .try_into()
-                .expect("Database returnd product with no stock."),
-            amount_per_unit: build_amount(amount_per_unit, measurement_unit),
+                .ok()
+                .and_then(|in_stock| in_stock.try_into().ok())
+                .expect("Database returned non-positive stock."),
+            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             vendor_name: vendor_name.into(),
             origin: origin.into(),
             special_offer_deal: Deal::from_repr(new_price, quantity1, quantity2, price)
@@ -271,7 +270,7 @@ struct ProductReprVendor {
     new_price: Option<Decimal>,
     quantity1: Option<i32>,
     quantity2: Option<i32>,
-    members_only: Option<bool>,
+    members_only: bool,
     favorited: bool,
 }
 
@@ -304,15 +303,11 @@ impl From<ProductReprVendor> for ProductOverviewVendor {
             in_stock: in_stock
                 .try_into()
                 .expect("Database returned negative stock."),
-            amount_per_unit: build_amount(amount_per_unit, measurement_unit),
+            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             origin: origin.into(),
-            special_offer: try_build_special_offer(
-                new_price,
-                quantity1,
-                quantity2,
-                members_only,
-                price,
-            ),
+            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
+                .expect("Database returned invalid special offer."),
+            special_offer_members_only: members_only,
             favorited,
         }
     }
@@ -332,7 +327,7 @@ struct ProductReprFavorited {
     new_price: Option<Decimal>,
     quantity1: Option<i32>,
     quantity2: Option<i32>,
-    members_only: Option<bool>,
+    members_only: bool,
     vendor_name: String,
 }
 
@@ -365,16 +360,12 @@ impl From<ProductReprFavorited> for ProductOverviewFavorited {
             in_stock: in_stock
                 .try_into()
                 .expect("Database returned negative stock."),
-            amount_per_unit: build_amount(amount_per_unit, measurement_unit),
+            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             vendor_name: vendor_name.into(),
             origin: origin.into(),
-            special_offer: try_build_special_offer(
-                new_price,
-                quantity1,
-                quantity2,
-                members_only,
-                price,
-            ),
+            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
+                .expect("Database returned invalid special offer."),
+            special_offer_members_only: members_only,
         }
     }
 }
@@ -399,7 +390,7 @@ pub async fn newest_products(
         ProductRepr,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            new_price, quantity1, quantity2, members_only,
+            new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             display_name AS vendor_name,
             EXISTS (
                 SELECT 1
@@ -456,7 +447,7 @@ pub async fn products_by_category(
         ProductRepr,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            new_price, quantity1, quantity2, members_only,
+            new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             display_name AS vendor_name,
             EXISTS (
                 SELECT 1
@@ -482,8 +473,8 @@ pub async fn products_by_category(
     .map(|products| products.into_iter().map(Into::<ProductOverview>::into).collect::<Box<_>>())
     .inspect(|products| {
         debug_assert!(
-            products.is_sorted_by_key(|ProductOverview { special_offer, price, .. }|
-                Reverse(special_offer.map(|(deal, _)| deal.average_discount(*price)))
+            products.is_sorted_by_key(|ProductOverview { special_offer_deal, price, .. }|
+                Reverse(special_offer_deal.map(|deal| deal.average_discount(*price)))
             )
         );
     })
@@ -511,7 +502,7 @@ pub async fn best_discounts(
         ProductReprDiscounted,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            new_price, quantity1, quantity2, members_only AS "members_only!",
+            new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             display_name AS vendor_name,
             EXISTS (
                 SELECT 1
@@ -566,7 +557,7 @@ pub async fn vendor_products(
         ProductReprVendor,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            new_price, quantity1, quantity2, members_only,
+            new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
@@ -590,8 +581,8 @@ pub async fn vendor_products(
     .map(|products| products.into_iter().map(Into::<ProductOverviewVendor>::into).collect::<Box<_>>())
     .inspect(|products| {
         debug_assert!(
-            products.is_sorted_by_key(|ProductOverviewVendor { special_offer, price, .. }|
-                Reverse(special_offer.map(|(deal, _)| deal.average_discount(*price)))
+            products.is_sorted_by_key(|ProductOverviewVendor { special_offer_deal, price, .. }|
+                Reverse(special_offer_deal.map(|deal| deal.average_discount(*price)))
             )
         );
     })
@@ -618,7 +609,7 @@ pub async fn favorites(
         ProductReprFavorited,
         r#"
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
-            new_price, quantity1, quantity2, members_only,
+            new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             display_name AS vendor_name
         FROM products p
         LEFT JOIN active_special_offers ON product = p.id

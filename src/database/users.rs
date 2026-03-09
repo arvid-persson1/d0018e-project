@@ -1,11 +1,12 @@
 //! Database functions for interacting with users.
 
-use crate::database::{Customer, Email, Id, Url, User, Username, Vendor};
+use crate::database::{Customer, Email, Id, ProfilePicture, Url, User, Username, Vendor};
 use dioxus::prelude::*;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use {
     crate::database::{POOL, QueryResultExt},
-    sqlx::query,
+    sqlx::{query, query_as},
 };
 
 /// Mark a user as deleted.
@@ -166,4 +167,70 @@ pub async fn set_vendor_description(vendor: Id<Vendor>, description: Box<str>) -
     .execute(&*POOL)
     .await?
     .by_unique_key(|| todo!())
+}
+
+/// Information about a vendor, for display on their profile page.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VendorProfile {
+    /// The username of the vendor. While public, this is not the primary name used to refer to the
+    /// vendor, see `display_name`.
+    pub username: Username,
+    /// The profile picture of the vendor.
+    pub profile_picture: ProfilePicture,
+    /// The display name of the vendor.
+    pub display_name: Box<str>,
+    /// A description of the vendor.
+    pub description: Box<str>,
+}
+
+#[cfg(feature = "server")]
+struct VendorProfileRepr {
+    username: String,
+    profile_picture: Option<String>,
+    display_name: String,
+    description: String,
+}
+
+#[cfg(feature = "server")]
+impl From<VendorProfileRepr> for VendorProfile {
+    fn from(
+        VendorProfileRepr {
+            username,
+            profile_picture,
+            display_name,
+            description,
+        }: VendorProfileRepr,
+    ) -> Self {
+        Self {
+            username: Username::new(username.into()).expect("Invalid username."),
+            profile_picture: ProfilePicture::Vendor(profile_picture.map(Into::into)),
+            display_name: display_name.into(),
+            description: description.into(),
+        }
+    }
+}
+
+/// Get information about a vendor, for display on their profile page.
+///
+/// # Errors
+///
+/// Fails if:
+/// - `vendor` is invalid.
+/// - An error occurs during communication with the database.
+#[server]
+pub async fn vendor_profile(id: Id<Vendor>) -> Result<VendorProfile> {
+    query_as!(
+        VendorProfileRepr,
+        r#"
+        SELECT username, profile_picture, display_name, description
+        FROM vendors v
+        JOIN users ON users.id = v.id
+        WHERE v.id = $1
+        "#,
+        id.get(),
+    )
+    .fetch_one(&*POOL)
+    .await
+    .map(Into::into)
+    .map_err(Into::into)
 }

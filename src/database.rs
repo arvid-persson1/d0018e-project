@@ -131,19 +131,3 @@ impl QueryResultExt for QueryResult {
         }
     }
 }
-
-/// Construct a [`ProfilePicture`] from its role-dependent representation in the database.
-///
-/// # Panics
-///
-/// Panics if the values do not uphold any of the database's invariants.
-#[cfg(feature = "server")]
-#[expect(clippy::unreachable, reason = "Database validation only.")]
-fn build_pfp(customer_pfp: Option<String>, vendor_pfp: Option<String>) -> (Role, ProfilePicture) {
-    match (customer_pfp, vendor_pfp) {
-        (Some(url), None) => (Role::Customer, ProfilePicture::new(url.into())),
-        (None, Some(url)) => (Role::Vendor, ProfilePicture::new(url.into())),
-        (None, None) => (Role::Administrator, ProfilePicture::admin()),
-        _ => unreachable!("Database returned inconsistent profile picture data."),
-    }
-}

@@ -1,8 +1,10 @@
 //! Database functions for interacting with a customer's shopping cart.
 
-use crate::database::{Customer, Id, Product, SpecialOffer};
+use crate::database::{Customer, Deal, Id, Product, SpecialOffer, Url};
 use dioxus::prelude::*;
 use hashbrown::HashMap;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
 #[cfg(feature = "server")]
 use {
@@ -34,8 +36,6 @@ pub type Counts = HashMap<Id<Product>, NonZeroU32>;
 /// Fails if:
 /// - `customer` is invalid.
 /// - An error occurs during communication with the database.
-/// # Panics
-/// Panics if the database returns a non-positive number.
 #[server]
 pub async fn cart_counts(customer: Id<Customer>) -> Result<HashMap<Id<Product>, NonZeroU32>> {
     query_as!(
@@ -134,6 +134,105 @@ pub async fn remove_deleted_from_cart(customer: Id<Customer>) -> Result<()> {
     .execute(&*POOL)
     .await
     .map(QueryResultExt::allow_any)
+    .map_err(Into::into)
+}
+
+/// A product in a user's shopping cart.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CartProduct {
+    /// The ID of the product.
+    pub id: Id<Product>,
+    /// The name of the product.
+    pub name: Box<str>,
+    /// URL to an image to display on the product card.
+    pub thumbnail: Url,
+    /// The price of the product before any discounts.
+    pub price: Decimal,
+    /// How many units are in stock. This should not be displayed directly, but may be used
+    /// together with `count` to display "low stock".
+    pub in_stock: u32,
+    /// How many units are in the cart.
+    pub count: NonZeroU32,
+    /// The currently active special offer on the product, if any and if the user is eligible.
+    pub special_offer_deal: Option<Deal>,
+    /// Whether the customer has marked the product as a favorite. Value is unspecified if a
+    /// customer ID was not provided.
+    pub favorited: bool,
+}
+
+#[cfg(feature = "server")]
+struct CartProductRepr {
+    id: i32,
+    name: String,
+    thumbnail: Url,
+    price: Decimal,
+    in_stock: i32,
+    count: i32,
+    new_price: Option<Decimal>,
+    quantity1: Option<i32>,
+    quantity2: Option<i32>,
+    favorited: bool,
+}
+
+#[cfg(feature = "server")]
+impl From<CartProductRepr> for CartProduct {
+    fn from(
+        CartProductRepr {
+            id,
+            name,
+            thumbnail,
+            price,
+            in_stock,
+            count,
+            new_price,
+            quantity1,
+            quantity2,
+            favorited,
+        }: CartProductRepr,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            thumbnail,
+            price,
+            in_stock: in_stock
+                .try_into()
+                .expect("Database returned negative stock."),
+            count: u32::try_from(count)
+                .ok()
+                .and_then(|count| count.try_into().ok())
+                .expect("Database returned non-positive cart item count."),
+            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
+                .expect("Database returned invalid special offer."),
+            favorited,
+        }
+    }
+}
+
+#[server]
+pub async fn cart_products(customer: Id<Customer>) -> Result<Box<[CartProduct]>> {
+    query_as!(
+        CartProductRepr,
+        r#"
+        SELECT p.id, name, thumbnail, price, in_stock, number AS count,
+            new_price, quantity1, quantity2,
+            EXISTS (
+                SELECT 1
+                FROM customer_favorites cf
+                WHERE cf.customer = $1 AND cf.product = p.id
+            ) AS "favorited!"
+        FROM shopping_cart_items s
+        JOIN products p ON p.id = s.product
+        JOIN customers ON customers.id = $1
+        LEFT JOIN active_special_offers ON active_special_offers.product = s.product
+            AND (NOT members_only OR member_since IS NOT NULL)
+        WHERE customer = $1
+        "#,
+        customer.get()
+    )
+    .fetch_all(&*POOL)
+    .await
+    .map(|products| products.into_iter().map(Into::into).collect())
     .map_err(Into::into)
 }
 

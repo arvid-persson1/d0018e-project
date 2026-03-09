@@ -11,10 +11,7 @@ use std::num::NonZeroU32;
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{
-        POOL, RawId,
-        products::{build_amount, build_average_rating, try_build_special_offer},
-    },
+    crate::database::{POOL, RawId},
     sqlx::{Type, query_as},
     std::cmp::Reverse,
 };
@@ -55,9 +52,14 @@ pub struct ProductInfo {
     pub updated_at: PrimitiveDateTime,
     /// The average rating of the product.
     pub rating: AverageRating,
-    /// The currently active special offer on the product if any, how many times each customer can
-    /// benefit from the deal, and whether it only applies to members.
-    pub special_offer: Option<(Deal, Option<NonZeroU32>, bool)>,
+    /// The currently active special offer on the product, if any.
+    pub special_offer_deal: Option<Deal>,
+    /// How many times each customer can benefit from the special offer, if there's a limit. Value
+    /// is unspecified if `special_offer_deal` is `None`.
+    pub special_offer_limit_per_customer: Option<NonZeroU32>,
+    /// Whether the special offer only applies to members. Value is unspecified if
+    /// `special_offer_deal` is `None`.
+    pub special_offer_members_only: bool,
     /// Whether the customer has marked the product as a favorite. Value is unspecified if a
     /// customer ID was not provided.
     pub favorited: bool,
@@ -79,7 +81,7 @@ struct CategoryPathSegment {
 #[cfg(feature = "server")]
 struct ProductInfoRepr {
     name: String,
-    gallery: Vec<String>,
+    gallery: Vec<Url>,
     thumbnail: String,
     price: Decimal,
     description: String,
@@ -94,7 +96,7 @@ struct ProductInfoRepr {
     quantity1: Option<i32>,
     quantity2: Option<i32>,
     limit_per_customer: Option<i32>,
-    members_only: Option<bool>,
+    members_only: bool,
     vendor_id: RawId,
     vendor_name: String,
     category_path: Vec<CategoryPathSegment>,
@@ -155,34 +157,23 @@ impl ProductInfo {
                 .into_iter()
                 .map(|CategoryPathSegment { id, name }| (id.into(), name.into()))
                 .collect(),
-            amount_per_unit: build_amount(amount_per_unit, measurement_unit),
+            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             visible,
             vendor_id: vendor_id.into(),
             vendor_name: vendor_name.into(),
             origin: origin.into(),
             created_at,
             updated_at,
-            rating: build_average_rating(average_rating, rating_count),
-            special_offer: try_build_special_offer(
-                new_price,
-                quantity1,
-                quantity2,
-                members_only,
-                price,
-            )
-            .map(|(deal, members_only)| {
-                (
-                    deal,
-                    limit_per_customer.map(|l| {
-                        u32::try_from(l)
-                            .ok()
-                            .and_then(NonZeroU32::new)
-                            .expect("Database returned non-positive limit.")
-                    }),
-                    members_only,
-                )
+            rating: AverageRating::from_repr(average_rating, rating_count),
+            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
+                .expect("Database returned invalid special offer."),
+            special_offer_limit_per_customer: limit_per_customer.map(|l| {
+                u32::try_from(l)
+                    .ok()
+                    .and_then(NonZeroU32::new)
+                    .expect("Database returned non-positive limit.")
             }),
-
+            special_offer_members_only: members_only,
             favorited,
             own_rating: Rating::new(own_rating.map_or(1, |r| {
                 r.try_into().expect("Database returned invalid own rating.")
@@ -211,9 +202,9 @@ pub async fn product_info(
         ProductInfoRepr,
         r#"
         SELECT name, thumbnail, price, p.description, in_stock, origin,
-            gallery AS "gallery: Vec<String>",
-            amount_per_unit, measurement_unit, visible, created_at, updated_at,
-            new_price, quantity1, quantity2, members_only, limit_per_customer,
+            gallery AS "gallery: Vec<Url>", amount_per_unit, measurement_unit, visible,
+            created_at, updated_at, new_price, quantity1, quantity2,
+            COALESCE(members_only, FALSE) AS "members_only!", limit_per_customer,
             vendors.id AS vendor_id, vendors.display_name AS vendor_name,
             category_path(category) AS "category_path!: Vec<CategoryPathSegment>",
             AVG(ratings.rating::FLOAT) AS average_rating,
@@ -315,7 +306,7 @@ impl From<PurchaseRepr> for Purchase {
                 .ok()
                 .and_then(NonZeroU32::new)
                 .expect("Database returned non-positive number in order."),
-            amount_per_unit: build_amount(amount_per_unit, measurement_unit),
+            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             product_name: product_name.into(),
             thumbnail: thumbnail.into(),
             vendor_name: vendor_name.into(),

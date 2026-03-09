@@ -1,14 +1,14 @@
 //! Database functions to interact with reviews and comments.
 
 use crate::database::{
-    Comment, Customer, Id, Product, ProfilePicture, Rating, Review, Role, Url, User, Username, Vote,
+    Comment, Customer, Id, Product, ProfilePicture, Rating, Review, Url, User, Username, Vote,
 };
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{POOL, QueryResultExt, RawId, build_pfp},
+    crate::database::{POOL, QueryResultExt, RawId, Role},
     hashbrown::HashMap,
     sqlx::{query, query_as},
     std::cmp::Reverse,
@@ -69,6 +69,11 @@ pub struct OwnReview {
 }
 
 /// A comment with its replies in a tree.
+///
+/// In certain cases, a badge should be displayed on the comment:
+/// - If the author (a customer) is the original poster of the review.
+/// - If the author (a vendor) is the owner of the product.
+/// - If the author is an administrator.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommentTree {
     /// The ID of the comment.
@@ -77,11 +82,6 @@ pub struct CommentTree {
     pub user_id: Id<User>,
     /// The username of the author.
     pub username: Username,
-    /// The role of the author. In certain cases, a badge should be displayed on the comment:
-    /// - If the user (a customer) is the original poster of the review.
-    /// - If the user (a vendor) is the owner of the product.
-    /// - If the user is an administrator.
-    pub role: Role,
     /// The profile picture of the authoring customer.
     pub profile_picture: ProfilePicture,
     /// The content of the comment.
@@ -103,7 +103,7 @@ struct ReviewRepr {
     id: RawId,
     customer: RawId,
     username: String,
-    profile_picture: String,
+    profile_picture: Option<String>,
     rating: i32,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
@@ -122,10 +122,9 @@ struct CommentRepr {
     content: String,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
+    role: Role,
+    profile_picture: Option<String>,
     sum_votes: i64,
-    // Fetched separately to identify role.
-    customer_pfp: Option<String>,
-    vendor_pfp: Option<String>,
 }
 
 #[cfg(feature = "server")]
@@ -137,21 +136,19 @@ impl From<CommentRepr> for CommentTree {
             review: _,
             user_id,
             username,
-            customer_pfp,
-            vendor_pfp,
+            role,
+            profile_picture,
             content,
             created_at,
             updated_at,
             sum_votes,
         }: CommentRepr,
     ) -> Self {
-        let (role, profile_picture) = build_pfp(customer_pfp, vendor_pfp);
         Self {
             id: id.into(),
             user_id: user_id.into(),
             username: Username::new(username.into()).expect("Invalid username."),
-            role,
-            profile_picture,
+            profile_picture: ProfilePicture::from_repr(profile_picture, role),
             content: content.into(),
             created_at,
             updated_at,
@@ -178,7 +175,7 @@ struct OtherReviewRepr {
     id: RawId,
     customer: RawId,
     username: String,
-    profile_picture: String,
+    profile_picture: Option<String>,
     rating: i32,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
@@ -209,7 +206,7 @@ impl From<OtherReviewRepr> for ProductReview {
             id: id.into(),
             customer: customer.into(),
             username: Username::new(username.into()).expect("Invalid username."),
-            profile_picture: ProfilePicture::new(profile_picture.into()),
+            profile_picture: ProfilePicture::Customer(profile_picture.map(Into::into)),
             rating: Rating::new(rating as u8).expect("Invalid rating."),
             created_at,
             updated_at,
@@ -232,11 +229,10 @@ struct CommentReprCustomer {
     content: String,
     created_at: PrimitiveDateTime,
     updated_at: PrimitiveDateTime,
+    role: Role,
+    profile_picture: Option<String>,
     sum_votes: i64,
     own_vote: Option<Vote>,
-    // Fetched separately to identify role.
-    customer_pfp: Option<String>,
-    vendor_pfp: Option<String>,
 }
 
 #[cfg(feature = "server")]
@@ -248,22 +244,20 @@ impl From<CommentReprCustomer> for CommentTree {
             review: _,
             user_id,
             username,
-            customer_pfp,
-            vendor_pfp,
             content,
-            sum_votes,
-            own_vote,
             created_at,
             updated_at,
+            role,
+            profile_picture,
+            sum_votes,
+            own_vote,
         }: CommentReprCustomer,
     ) -> Self {
-        let (role, profile_picture) = build_pfp(customer_pfp, vendor_pfp);
         Self {
             id: id.into(),
             user_id: user_id.into(),
             username: Username::new(username.into()).expect("Invalid username."),
-            role,
-            profile_picture,
+            profile_picture: ProfilePicture::from_repr(profile_picture, role),
             content: content.into(),
             created_at,
             updated_at,
@@ -319,7 +313,7 @@ pub async fn product_reviews(
     let reviews = query_as!(
         ReviewRepr,
         r#"
-        SELECT r.id, r.customer, username, profile_picture AS "profile_picture!", rating,
+        SELECT r.id, r.customer, username, profile_picture, rating,
             r.created_at, r.updated_at, title, content,
             COALESCE(SUM(CASE review_votes.grade
                 WHEN 'like' THEN 1
@@ -347,18 +341,19 @@ pub async fn product_reviews(
         CommentRepr,
         r#"
         SELECT c.id, parent, review, user_id, username, content, c.created_at, c.updated_at,
-            customers.profile_picture AS customer_pfp, vendors.profile_picture AS vendor_pfp,
+            role_of(c.user_id) AS "role!: Role",
+            COALESCE(cu.profile_picture, ve.profile_picture) AS profile_picture,
             COALESCE(SUM(CASE comment_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
             END), 0) AS "sum_votes!"
         FROM comments c
         JOIN users ON users.id = c.user_id
-        LEFT JOIN customers ON customers.id = c.user_id
-        LEFT JOIN vendors ON vendors.id = c.user_id
+        LEFT JOIN customers cu ON cu.id = c.user_id
+        LEFT JOIN vendors ve ON ve.id = c.user_id
         LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($1)
-        GROUP BY c.id, username, customer_pfp, vendor_pfp
+        GROUP BY c.id, username, cu.profile_picture, ve.profile_picture
         ORDER BY parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         &*reviews
@@ -419,7 +414,7 @@ pub async fn product_reviews(
                     id: id.into(),
                     customer: customer.into(),
                     username: Username::new(username.into()).expect("Invalid username."),
-                    profile_picture: ProfilePicture::new(profile_picture.into()),
+                    profile_picture: ProfilePicture::Customer(profile_picture.map(Into::into)),
                     rating: Rating::new(rating as u8).expect("Invalid rating."),
                     created_at,
                     updated_at,
@@ -542,7 +537,8 @@ pub async fn product_reviews_as(
         CommentReprCustomer,
         r#"
         SELECT c.id, parent, review, user_id, username, content, c.created_at, c.updated_at,
-            cu.profile_picture AS customer_pfp, ve.profile_picture AS vendor_pfp,
+            role_of(c.user_id) AS "role!: Role",
+            COALESCE(cu.profile_picture, ve.profile_picture) AS profile_picture,
             COALESCE(SUM(CASE comment_votes.grade
                 WHEN 'like' THEN 1
                 WHEN 'dislike' THEN -1
@@ -558,7 +554,7 @@ pub async fn product_reviews_as(
         LEFT JOIN vendors ve ON ve.id = c.user_id
         LEFT JOIN comment_votes ON comment = c.id
         WHERE review = ANY($2)
-        GROUP BY c.id, username, customer_pfp, vendor_pfp
+        GROUP BY c.id, username, cu.profile_picture, ve.profile_picture
         ORDER BY review, parent NULLS FIRST, "sum_votes!" DESC, created_at
         "#,
         customer.get(),
@@ -642,7 +638,7 @@ pub async fn product_reviews_as(
                     id: id.into(),
                     customer: customer.into(),
                     username: Username::new(username.into()).expect("Invalid username."),
-                    profile_picture: ProfilePicture::new(profile_picture.into()),
+                    profile_picture: ProfilePicture::Customer(profile_picture.map(Into::into)),
                     rating: Rating::new(rating as u8).expect("Invalid rating."),
                     created_at,
                     updated_at,

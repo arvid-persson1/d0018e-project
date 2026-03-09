@@ -39,6 +39,8 @@ CREATE DOMAIN PHC_STRING AS TEXT;
 
 CREATE TYPE VOTE AS ENUM ('like', 'dislike');
 
+CREATE TYPE ROLE AS ENUM ('customer', 'vendor', 'administrator');
+
 CREATE TABLE users (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     username USERNAME UNIQUE NOT NULL,
@@ -102,6 +104,27 @@ CREATE TABLE vendors (
 CREATE TABLE administrators (
     id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE FUNCTION role_of(id users.id%TYPE) RETURNS ROLE
+LANGUAGE plpgsql STABLE STRICT PARALLEL SAFE AS $$
+DECLARE
+    role ROLE;
+BEGIN
+    CASE
+        WHEN EXISTS(SELECT 1 FROM customers WHERE customers.id = role_of.id)
+            THEN role := 'customer';
+        WHEN EXISTS(SELECT 1 FROM vendors WHERE vendors.id = role_of.id)
+            THEN role := 'vendor';
+        WHEN EXISTS(SELECT 1 FROM administrators WHERE administrators.id = role_of.id) 
+            THEN role := 'administrator';
+        WHEN NOT EXISTS(SELECT 1 FROM users WHERE users.id = role_of.id)
+            THEN RAISE EXCEPTION 'User does not exist.';
+        ELSE RAISE EXCEPTION 'User does not exist or unknown role.';
+    END CASE;
+
+    RETURN role;
+END;
+$$;
 
 CREATE FUNCTION update_time_user_super() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
