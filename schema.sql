@@ -980,13 +980,12 @@ CREATE TABLE orders (
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
-CREATE PROCEDURE checkout(
-    customer_id customers.id%TYPE,
-    -- If this is non-null, customer has seen that these offers should apply to their purchase.
-    -- Instead of getting active special offers the customer is eligible for, get these specifically
-    -- and check for validity and eligibility. Also fails if this contains duplicates.
-    expected_offers INT[] DEFAULT NULL
-)
+-- TODO: Cart must be frozen or copied when the customer is viewing it to prevent cart items from
+-- updating due to concurrent access. It must also be verified that the special offers used in
+-- price calculation and the product base prices are the same ones they see in the cart so they way
+-- the expected price.
+
+CREATE PROCEDURE checkout(customer_id customers.id%TYPE)
 LANGUAGE plpgsql AS $$
 DECLARE
     found_offers INT;
@@ -1046,7 +1045,6 @@ BEGIN
         WHERE valid_from <= CURRENT_TIMESTAMP
             AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
             AND (NOT members_only OR member_since IS NOT NULL)
-            AND (expected_offers IS NULL OR s.id = ANY(expected_offers))
         ORDER BY s.id
         FOR KEY SHARE OF s
     )
@@ -1069,13 +1067,6 @@ BEGIN
         WHERE special_offer = eligible_offers.id AND customer = customer_id
         FOR NO KEY UPDATE
     ) sou ON TRUE;
-    -- Consider better error reporting and ignoring duplicates instead of failing.
-    IF expected_offers IS NOT NULL THEN
-        GET DIAGNOSTICS found_offers := ROW_COUNT;
-        IF found_offers < CARDINALITY(expected_offers) THEN
-            RAISE EXCEPTION 'One or more expected special offers was a duplicate, does not exist, is not active, is for a product not in the cart, or the customer is not eligible for it.';
-        END IF;
-    END IF;
 
     -- Fails on negative stock.
     UPDATE products
@@ -1106,5 +1097,3 @@ BEGIN
     FROM results;
 END;
 $$;
-
-

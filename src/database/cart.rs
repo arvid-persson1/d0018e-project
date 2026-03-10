@@ -1,6 +1,6 @@
 //! Database functions for interacting with a customer's shopping cart.
 
-use crate::database::{Customer, Deal, Id, Product, SpecialOffer, Url};
+use crate::database::{Customer, Deal, Id, Product, Url};
 use dioxus::prelude::*;
 use hashbrown::HashMap;
 use rust_decimal::Decimal;
@@ -252,21 +252,10 @@ pub async fn cart_products(customer: Id<Customer>) -> Result<Box<[CartProduct]>>
 /// - The customer has more units in their cart than there are in stock.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn checkout(
-    customer: Id<Customer>,
-    expected_offers: Option<Box<[Id<SpecialOffer>]>>,
-) -> Result<()> {
-    // This should be a no-op.
-    // TODO: Verify safety and transmute?
-    let expected_offers =
-        expected_offers.map(|ids| ids.into_iter().map(Id::get).collect::<Box<_>>());
-    query!(
-        "CALL checkout($1, $2)",
-        customer.get(),
-        expected_offers.as_deref(),
-    )
-    .execute(&*POOL)
-    .await
-    .map(QueryResultExt::procedure)
-    .map_err(Into::into)
+pub async fn checkout(customer: Id<Customer>) -> Result<()> {
+    query!("CALL checkout($1)", customer.get())
+        .execute(&*POOL)
+        .await
+        .map(QueryResultExt::procedure)
+        .map_err(Into::into)
 }
