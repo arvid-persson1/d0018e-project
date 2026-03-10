@@ -308,7 +308,7 @@ CREATE TABLE products (
     origin TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
+    search_vector TSVECTOR NOT NULL,
     amount_per_unit TWOPOINT_UDEC NOT NULL DEFAULT 1,
     -- Null: discrete amount.
     measurement_unit TEXT,
@@ -327,6 +327,46 @@ FOR EACH ROW EXECUTE FUNCTION creation_time();
 CREATE TRIGGER products_update_time
 BEFORE UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION update_time();
+
+CREATE FUNCTION products_search_vector(product products.id%TYPE) RETURNS TSVECTOR
+LANGUAGE sql STABLE STRICT PARALLEL SAFE AS $$
+    SELECT setweight(to_tsvector('english', p.name), 'A')
+        || setweight(to_tsvector('english', p.overview), 'D')
+        || setweight(to_tsvector('english', p.description), 'D')
+        || setweight(to_tsvector('english', c.name), 'B')
+    FROM products p
+    JOIN categories c ON p.category = c.id
+    WHERE p.id = product;
+$$;
+
+CREATE FUNCTION products_set_search_vector() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.search_vector := products_search_vector(NEW.id);
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER products_update_search_vector
+BEFORE INSERT OR UPDATE OF name, overview, description, category ON products
+FOR EACH ROW EXECUTE FUNCTION products_set_search_vector();
+
+CREATE FUNCTION categories_set_products_search_vector() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE products
+    SET search_vector = products_search_vector(id)
+    WHERE category = NEW.id;
+
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER categories_update_products_search_vector
+AFTER UPDATE OF name ON categories
+FOR EACH ROW EXECUTE FUNCTION categories_set_products_search_vector();
+
+CREATE INDEX products_by_search_vector ON products USING GIN(search_vector);
 
 CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

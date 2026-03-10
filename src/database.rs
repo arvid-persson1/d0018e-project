@@ -35,6 +35,7 @@ pub mod categories;
 pub mod offers;
 pub mod products;
 pub mod reviews;
+pub mod search;
 pub mod users;
 
 #[cfg(feature = "server")]

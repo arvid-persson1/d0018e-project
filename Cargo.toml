@@ -16,6 +16,7 @@ derive_more = { default-features = false, features = [
 ], version = "2.1.1" }
 dioxus = { features = ["fullstack", "router"], version = "0.7.1" }
 dotenvy = { default-features = false, optional = true, version = "0.15.7" }
+gloo-timers = { default-features = false, optional = true, version = "0.3.0" }
 hashbrown = { default-features = false, features = [
     "alloc",
     "default-hasher",
@@ -25,7 +26,13 @@ hashbrown = { default-features = false, features = [
 ], version = "0.16.1" }
 http = { default-features = false, features = ["std"], optional = true, version = "1.4.0" }
 nameof = "1.3.0"
-regex = { default-features = false, features = ["perf", "perf-dfa-full", "std", "unicode-gencat", "unicode-perl"], version = "1.12.2" }
+regex = { default-features = false, features = [
+    "perf",
+    "perf-dfa-full",
+    "std",
+    "unicode-gencat",
+    "unicode-perl",
+], version = "1.12.2" }
 rust_decimal = { default-features = false, features = ["serde", "std"], version = "1.40.0" }
 serde = { default-features = false, features = ["alloc", "derive", "std"], version = "1.0.228" }
 sqlx = { default-features = false, features = [
@@ -47,7 +54,7 @@ web-sys = { features = ["HtmlDocument"], optional = true, version = "0.3.91" }
 [features]
 default = ["web"]
 server = ["dep:argon2", "dep:dotenvy", "dep:http", "dep:sqlx", "dep:tokio", "dioxus/server"]
-web = ["dep:web-sys", "dioxus/web"]
+web = ["dep:gloo-timers", "dep:web-sys", "dioxus/web"]
 
 [profile.dev]
 codegen-units = 256
