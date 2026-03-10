@@ -147,7 +147,7 @@ pub async fn log_in(username: Username, password: Box<str>) -> Result<Response> 
             (
                 [(
                     SET_COOKIE,
-                    format!("user_id={}; Path=/; HttpOnly=false", id),
+                    format!("user_id={}; Path=/; SameSite=Lax", id),
                 )],
                 "",
             )

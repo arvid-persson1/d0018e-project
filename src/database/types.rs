@@ -641,6 +641,7 @@ pub enum DealError {
 /// A vote on a review or comment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "server", derive(Type))]
+#[cfg_attr(feature = "server", sqlx(type_name = "vote", rename_all = "lowercase"))]
 pub enum Vote {
     /// The user disliked the review/comment. Counts as -1 for tallying.
     Dislike,
@@ -651,6 +652,7 @@ pub enum Vote {
 /// The role of a user.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "server", derive(Type))]
+#[cfg_attr(feature = "server", sqlx(type_name = "role", rename_all = "lowercase"))]
 pub enum Role {
     /// The author is a customer.
     Customer,

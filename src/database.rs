@@ -20,7 +20,7 @@ pub use types::*;
 mod id;
 pub use id::*;
 
-mod auth;
+pub mod auth;
 pub use auth::*;
 
 // FIXME: It's possible that `Decimal`s will have to be rescaled, clamped, truncated or rounded

@@ -2,6 +2,7 @@
 
 #![cfg_attr(feature = "server", feature(iter_collect_into))]
 #![cfg_attr(feature = "server", feature(never_type))]
+#![cfg_attr(feature = "web", allow(unused_crate_dependencies))]
 
 pub mod components;
 use components::Navbar;
@@ -15,7 +16,7 @@ use state::GlobalState;
 use dioxus::prelude::*;
 use views::{
     Administration, CategoryPage, CustomerProfile, FavoritesPage, Home, Login, Product,
-    ProfilePage, Register, VendorLogin, VendorPage, VendorRegister,
+    ProfilePage, Register, Search, VendorLogin, VendorPage, VendorRegister,
 };
 
 /// Structure of all non-internal endpoints.
@@ -53,6 +54,12 @@ enum Route {
         /// The ID of the category.
         id: Id<Category>,
     },
+    /// See [`Search`].
+    #[route("/search/:query", Search)]
+    Search {
+        /// Söksträngen.
+        query: String,
+    },
     /// See [`Login`].
     #[route("/login", Login)]
     Login,
@@ -74,7 +81,45 @@ enum Route {
 #[allow(non_snake_case)]
 #[component]
 fn App() -> Element {
-    let _ = use_context_provider(|| Signal::new(GlobalState::default()));
+    let mut global_state = use_context_provider(|| Signal::new(GlobalState::default()));
+
+    let _effect = use_effect(move || {
+        let _task = spawn(async move {
+            #[cfg(feature = "web")]
+            {
+                use crate::database::{Id, RawId, User, login_info};
+                use web_sys::{HtmlDocument, wasm_bindgen::JsCast as _, window};
+                if let Some(window) = window()
+                    && let Some(document) = window.document()
+                    && let Ok(html) = document.dyn_into::<HtmlDocument>()
+                    && let Ok(cookies) = html.cookie()
+                {
+                    if let Some(value) = cookies
+                        .split(';')
+                        .filter_map(|pair| pair.split_once('='))
+                        .find(|(key, _)| key.trim() == "user_id")
+                        .map(|(_, value)| value.trim().to_string())
+                        && !value.is_empty()
+                        && let Ok(id) = value.parse::<RawId>()
+                    {
+                        match login_info(Id::<User>::from(id)).await {
+                            Ok(info) => {
+                                global_state.write().login = Some(info);
+
+                                let customer_id = global_state.read().customer_id();
+                                if let Some(customer_id) = customer_id {
+                                    if let Ok(favs) = crate::database::products::favorites(customer_id, 1000, 0).await {
+                                        global_state.write().favorites = favs.iter().map(|p| p.id.get()).collect();
+                                    }
+                                }
+                            }
+                            Err(_e) => {}
+                        }
+                    }
+                }
+            }
+        });
+    });
     rsx! {
         // TODO: Is this required?
         document::Script { src: "https://cdn.tailwindcss.com" }

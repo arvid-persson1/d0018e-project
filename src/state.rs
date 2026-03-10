@@ -1,3 +1,4 @@
+use crate::database::Login;
 //use dioxus::prelude::*;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,6 +15,7 @@ pub struct CartItem {
 pub struct GlobalState {
     pub cart: Vec<CartItem>,
     pub favorites: Vec<i32>,
+    pub login: Option<Login>,
 }
 
 impl GlobalState {
@@ -49,5 +51,14 @@ impl GlobalState {
 
     pub fn cart_count(&self) -> usize {
         self.cart.iter().map(|i| i.quantity as usize).sum()
+    }
+    pub fn customer_id(&self) -> Option<crate::database::Id<crate::database::Customer>> {
+        self.login.as_ref().and_then(|l| {
+            if let crate::database::LoginId::Customer(id) = l.id {
+                Some(id)
+            } else {
+                None
+            }
+        })
     }
 }
