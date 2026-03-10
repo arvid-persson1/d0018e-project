@@ -18,7 +18,6 @@ pub struct ProductProps {
 pub fn ProductCard(props: ProductProps) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
 
-    // TODO(db): Favoriter ska hämtas från databasen per inloggad användare
     let is_favorite = global_state.read().favorites.contains(&props.id);
 
     let product_id = props.id;
@@ -26,7 +25,6 @@ pub fn ProductCard(props: ProductProps) -> Element {
     let product_price = props.price;
     let product_image = props.image_url.clone();
 
-    // Pris format
     let formatted_price = format!("{:.2}", props.price).replace('.', ",");
     let formatted_comparison = props.comparison_price.replace('.', ",");
 
@@ -43,10 +41,10 @@ pub fn ProductCard(props: ProductProps) -> Element {
         .find(|i| i.product_id == product_id)
         .map(|i| i.quantity)
         .unwrap_or(0);
+    
     rsx! {
         div { class: "bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition p-4 flex flex-col gap-3 relative",
 
-            // Länk i bilden för produktsidan
             Link {
                 to: Route::Product {
                     id: props.id.into(),
@@ -70,13 +68,11 @@ pub fn ProductCard(props: ProductProps) -> Element {
                 p { class: "text-gray-500 text-xs font-medium", "Jfr pris {formatted_comparison}" }
             }
 
-            // Köpknapp och favoritknapp
             div { class: "flex items-center gap-2 mt-auto",
                 if quantity == 0 {
                     button {
                         class: "flex-grow bg-green-700 text-white font-bold py-2 rounded-full hover:bg-green-800 transition flex justify-center items-center gap-2",
                         onclick: move |_| {
-                            // TODO(db): Ersätt med API-anrop set_in_shopping_cart(customer_id, product_id, 1)
                             global_state
                                 .write()
                                 .add_to_cart(
@@ -93,7 +89,6 @@ pub fn ProductCard(props: ProductProps) -> Element {
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
-                                // TODO(db): Ersätt med API-anrop set_in_shopping_cart(customer_id, product_id, quantity-1)
                                 global_state.write().set_quantity(product_id, quantity - 1);
                             },
                             i { class: "fas fa-minus" }
@@ -102,7 +97,6 @@ pub fn ProductCard(props: ProductProps) -> Element {
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
-                                // TODO(db): Ersätt med API-anrop set_in_shopping_cart(customer_id, product_id, quantity+1)
                                 global_state.write().set_quantity(product_id, quantity + 1);
                             },
                             i { class: "fas fa-plus" }
@@ -111,15 +105,36 @@ pub fn ProductCard(props: ProductProps) -> Element {
                 }
 
                 // Favoritknapp
-                // TODO(db): Ersätt med API-anrop
+                // Favoritknapp; sparar i databasen om inloggad, annars bara lokalt
                 button {
                     class: "p-2 transition-colors {heart_class} text-xl",
                     onclick: move |_| {
+                        let customer_id = global_state.read().customer_id();
+                        let new_state = !global_state.read().favorites.contains(&product_id);
+
+                        // Uppdatera lokalt direkt
                         let mut state = global_state.write();
-                        if state.favorites.contains(&product_id) {
-                            state.favorites.retain(|&x| x != product_id);
-                        } else {
+                        if new_state {
                             state.favorites.push(product_id);
+                        } else {
+                            state.favorites.retain(|&x| x != product_id);
+                        }
+                        drop(state);
+
+                        // Spara i databasen om inloggad
+                        if let Some(cid) = customer_id {
+                            #[allow(unused_results)]
+                            spawn(async move {
+                                let db_id = crate::database::Id::<
+                                    crate::database::Product,
+                                >::from(product_id);
+                                let _unused = crate::database::products::set_favorite(
+                                        cid,
+                                        db_id,
+                                        new_state,
+                                    )
+                                    .await;
+                            });
                         }
                     },
                     if is_favorite {

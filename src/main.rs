@@ -103,11 +103,17 @@ fn App() -> Element {
                         && let Ok(id) = value.parse::<RawId>()
                     {
                         match login_info(Id::<User>::from(id)).await {
-                            Ok(info) => {         
+                            Ok(info) => {
                                 global_state.write().login = Some(info);
+
+                                let customer_id = global_state.read().customer_id();
+                                if let Some(customer_id) = customer_id {
+                                    if let Ok(favs) = crate::database::products::favorites(customer_id, 1000, 0).await {
+                                        global_state.write().favorites = favs.iter().map(|p| p.id.get()).collect();
+                                    }
+                                }
                             }
-                            Err(e) => {  
-                            }
+                            Err(_e) => {}
                         }
                     }
                 }
