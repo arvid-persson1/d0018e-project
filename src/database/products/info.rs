@@ -228,7 +228,7 @@ pub async fn product_info(
         LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = vendor
         LEFT JOIN ratings ON ratings.product = p.id
-        WHERE p.id = $1
+        WHERE p.id = $2
         GROUP BY p.id, vendors.id, new_price, quantity1, quantity2, members_only, limit_per_customer
         "#,
         customer.map(Id::get),

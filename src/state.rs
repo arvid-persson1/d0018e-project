@@ -1,3 +1,4 @@
+use crate::database::Login;
 //use dioxus::prelude::*;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,6 +15,7 @@ pub struct CartItem {
 pub struct GlobalState {
     pub cart: Vec<CartItem>,
     pub favorites: Vec<i32>,
+    pub login: Option<Login>,
 }
 
 impl GlobalState {

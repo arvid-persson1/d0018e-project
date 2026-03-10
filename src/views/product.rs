@@ -1,10 +1,11 @@
 use crate::Route;
-use crate::database::products::product_info;
-use crate::database::{Id, Product as DbProduct};
+use crate::components::product_card::ProductCard;
+use crate::database::products::{product_info, products_by_category};
+use crate::database::{Category, Id, Product as DbProduct};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
+use rust_decimal::prelude::ToPrimitive;
 
-// Class for product page
 /// Product page
 /// # Arguments
 /// * `id` - The product ID to display.
@@ -39,32 +40,11 @@ pub fn Product(id: i32) -> Element {
         "text-gray-400 hover:text-red-500"
     };
 
-    // Klass för betyg stjärnor
-    let s1 = if selected_rating() >= 1 {
-        "text-yellow-400"
-    } else {
-        "text-gray-300"
-    };
-    let s2 = if selected_rating() >= 2 {
-        "text-yellow-400"
-    } else {
-        "text-gray-300"
-    };
-    let s3 = if selected_rating() >= 3 {
-        "text-yellow-400"
-    } else {
-        "text-gray-300"
-    };
-    let s4 = if selected_rating() >= 4 {
-        "text-yellow-400"
-    } else {
-        "text-gray-300"
-    };
-    let s5 = if selected_rating() >= 5 {
-        "text-yellow-400"
-    } else {
-        "text-gray-300"
-    };
+    let s1 = if selected_rating() >= 1 { "text-yellow-400" } else { "text-gray-300" };
+    let s2 = if selected_rating() >= 2 { "text-yellow-400" } else { "text-gray-300" };
+    let s3 = if selected_rating() >= 3 { "text-yellow-400" } else { "text-gray-300" };
+    let s4 = if selected_rating() >= 4 { "text-yellow-400" } else { "text-gray-300" };
+    let s5 = if selected_rating() >= 5 { "text-yellow-400" } else { "text-gray-300" };
 
     rsx! {
         div { class: "max-w-6xl mx-auto p-4 md:p-8 bg-white",
@@ -78,7 +58,6 @@ pub fn Product(id: i32) -> Element {
                 "Tillbaka till start"
             }
 
-            // Hantering av databas-resursen
             match &*product_resource.read_unchecked() {
                 None => rsx! {
                     div { class: "flex justify-center items-center py-20",
@@ -97,7 +76,6 @@ pub fn Product(id: i32) -> Element {
                     let rating_count = product.rating.count();
                     let full_stars = avg_rating.round() as usize;
 
-                    // Klona värden för closures
                     let pname = product.name.to_string();
                     let pprice = product.price.to_string().parse::<f64>().unwrap_or(0.0);
                     let pimage = product
@@ -105,22 +83,12 @@ pub fn Product(id: i32) -> Element {
                         .first()
                         .map(|u| u.to_string())
                         .unwrap_or_default();
+
+                    // Hämta kategori-ID från produktens kategoriväg (sista = mest specifik)
+                    let category_id = product.category.last().map(|(cat_id, _)| *cat_id);
+
                     rsx! {
                         div { class: "grid grid-cols-1 md:grid-cols-2 gap-12 mb-16",
-
-            // Bild-sidan
-
-
-                            // Betyg under bilden
-
-                            // Info-sidan
-
-                            // Pris
-
-                            // Köp/Favorit knappar
-                            // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity-1)
-                            // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity+1)
-                            // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)
                             div { class: "flex flex-col items-center",
                                 div { class: "bg-gray-50 rounded-xl p-8 w-full flex justify-center",
                                     if let Some(img) = product.gallery.first() {
@@ -135,7 +103,7 @@ pub fn Product(id: i32) -> Element {
                                     div { class: "flex text-yellow-400 text-xl",
                                         for i in 0..5_usize {
                                             if i < full_stars {
-                                                i { class: "fa-solid fa-star" } // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, 1)
+                                                i { class: "fa-solid fa-star" }
                                             } else {
                                                 i { class: "fa-regular fa-star" }
                                             }
@@ -145,14 +113,14 @@ pub fn Product(id: i32) -> Element {
                                         "{avg_rating:.1} av 5 ({rating_count} recensioner)"
                                     }
                                 }
-                            } // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity+1)
+                            }
 
                             div { class: "flex flex-col justify-start",
                                 h1 { class: "text-4xl font-black text-gray-900 mb-2", "{product.name}" }
-                                p { class: "text-gray-500 text-lg mb-4", "{product.description}" } // TODO(db): Ersätt med set_in_shopping_cart(customer_id, product_id, quantity+1)
+                                p { class: "text-gray-500 text-lg mb-4", "{product.description}" }
 
                                 div { class: "border-t border-b py-6 mb-6",
-                                    div { class: "text-red-600 font-black text-5xl mb-1", "{formatted_price} kr" } // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)
+                                    div { class: "text-red-600 font-black text-5xl mb-1", "{formatted_price} kr" }
                                     div { class: "text-gray-500 font-bold", "Säljs av {product.vendor_name}" }
                                 }
 
@@ -176,7 +144,7 @@ pub fn Product(id: i32) -> Element {
                                                 i { class: "fas fa-minus" }
                                             }
                                             span { class: "font-black text-2xl text-green-900", "{quantity}" }
-                                            button { // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite) // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite) // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite) // TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)  TODO(db): Ersätt med set_favorite(customer_id, product_id, !is_favorite)
+                                            button {
                                                 class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
                                                 onclick: move |_| {
                                                     global_state.write().set_quantity(id, quantity + 1);
@@ -200,13 +168,18 @@ pub fn Product(id: i32) -> Element {
                                 }
                             }
                         }
+
+                        // Liknande produkter – hämtas från samma kategori, exkluderar denna produkt
+                        div { class: "border-t pt-16 mb-16",
+                            h2 { class: "text-3xl font-black mb-8 text-gray-900", "Liknande produkter" }
+                            if let Some(cat_id) = category_id {
+                                SimilarProducts { category_id: cat_id, exclude_id: db_id }
+                            } else {
+                                p { class: "text-gray-400", "Inga liknande produkter." }
+                            }
+                        }
                     }
                 }
-            }
-            // Liknande produkter
-            div { class: "border-t pt-16 mb-16",
-                h2 { class: "text-3xl font-black mb-8 text-gray-900", "Liknande produkter" }
-                p { class: "text-gray-400", "Laddas när databasen är kopplad." }
             }
 
             // Recensions-sektion
@@ -215,7 +188,6 @@ pub fn Product(id: i32) -> Element {
                 div { class: "bg-green-50 p-6 rounded-2xl mb-10 border border-green-100",
                     h3 { class: "font-bold text-lg mb-4 text-green-900", "Skriv en recension" }
 
-                    // Stjärnor med dina s1-s5 klasser
                     div { class: "flex gap-2 mb-4",
                         i {
                             class: "fa-solid fa-star text-2xl cursor-pointer {s1}",
@@ -261,7 +233,6 @@ pub fn Product(id: i32) -> Element {
                     }
                 }
 
-                // Exempelrecension
                 div { class: "space-y-6",
                     div { class: "border-b pb-6",
                         div { class: "flex gap-1 mb-2",
@@ -273,58 +244,54 @@ pub fn Product(id: i32) -> Element {
                             span { class: "font-bold text-gray-900", "Namn Efternamn" }
                             span { class: "text-gray-400 text-sm", "• Verifierat köp" }
                         }
-                        div { class: "max-w-3xl",
-                            h2 { class: "text-2xl font-black mb-8", "Vad tycker andra kunder?" }
-                            div { class: "bg-green-50 p-6 rounded-2xl mb-10 border border-green-100",
-                                h3 { class: "font-bold text-lg mb-4 text-green-900",
-                                    "Skriv en recension"
-                                }
-                                div { class: "flex gap-2 mb-4",
-                                    for n in 1_u8..=5 {
-                                        i {
-                                            class: if selected_rating() >= n { "fa-solid fa-star text-2xl cursor-pointer text-yellow-400" } else { "fa-solid fa-star text-2xl cursor-pointer text-gray-300" },
-                                            onclick: move |_| selected_rating.set(n),
-                                        }
-                                    }
-                                }
-                                textarea {
-                                    class: "w-full border-2 border-white rounded-xl p-4 mb-2 focus:border-green-500 outline-none transition-all",
-                                    rows: "4",
-                                    maxlength: "{max_chars}",
-                                    placeholder: "Berätta mer om produkten...",
-                                    oninput: move |evt| text_val.set(evt.value()),
-                                }
-                                div { class: "flex justify-end mb-4",
-                                    span { class: "text-sm text-gray-500",
-                                        "{text_val().len()} / {max_chars} tecken"
-                                    }
-                                }
-                                button {
-                                    class: "bg-green-700 text-white px-8 py-3 rounded-full font-bold hover:bg-green-800 transition shadow-sm disabled:opacity-30 disabled:cursor-not-allowed",
-                                    disabled: selected_rating() == 0,
-                                    "Skicka recension"
-                                }
-                            }
-                            div { class: "space-y-6",
-                                div { class: "border-b pb-6",
-                                    div { class: "flex gap-1 mb-2",
-                                        for _ in 0..5 {
-                                            i { class: "fa-solid fa-star text-yellow-400 text-sm" }
-                                        }
-                                    }
-                                    div { class: "flex items-center gap-2 mb-2",
-                                        span { class: "font-bold text-gray-900", "Exempelrecension" }
-                                        span { class: "text-gray-400 text-sm", "• Verifierat köp" }
-                                    }
-                                    p { class: "text-gray-600 leading-relaxed",
-                                        "Recensioner visas här när databasen är kopplad."
-                                    }
-                                }
-                            }
+                        p { class: "text-gray-600 leading-relaxed",
+                            "Recensioner visas här när databasen är kopplad."
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/// Visar liknande produkter i samma kategori
+#[derive(Props, Clone, PartialEq)]
+struct SimilarProductsProps {
+    category_id: Id<Category>,
+    exclude_id: Id<DbProduct>,
+}
+
+#[component]
+fn SimilarProducts(props: SimilarProductsProps) -> Element {
+    let category_id = props.category_id;
+    let exclude_id = props.exclude_id;
+
+    let similar = use_resource(move || async move {
+        products_by_category(None, category_id, Some(exclude_id), 4, 0).await
+    });
+
+    match &*similar.read() {
+        None => rsx! {
+            p { class: "text-gray-400 animate-pulse", "Laddar liknande produkter..." }
+        },
+        Some(Err(_)) => rsx! {
+            p { class: "text-gray-400", "Kunde inte hämta liknande produkter." }
+        },
+        Some(Ok(items)) if items.is_empty() => rsx! {
+            p { class: "text-gray-400", "Inga liknande produkter hittades." }
+        },
+        Some(Ok(items)) => rsx! {
+            div { class: "grid grid-cols-2 md:grid-cols-4 gap-6",
+                for p in items.iter() {
+                    ProductCard {
+                        id: p.id.get(),
+                        name: p.name.clone(),
+                        price: p.price.to_f64().unwrap_or_default(),
+                        comparison_price: format!("{:.2} kr", p.price),
+                        image_url: p.thumbnail.to_string(),
+                    }
+                }
+            }
+        },
     }
 }

@@ -2,6 +2,7 @@ use crate::Route;
 use crate::components::auth_dropdown::AuthDropdown;
 use crate::components::cart_dropdown::CartDropdown;
 use crate::database::categories::category_trees;
+use crate::database::search::search_products;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 
@@ -53,6 +54,21 @@ pub fn Navbar() -> Element {
     let fav_count = global_state.read().favorites.len();
     let cart_count = global_state.read().cart_count();
 
+    let mut search_query = use_signal(String::new);
+    let mut show_search_results = use_signal(|| false);
+
+    // Hämta sökresultat
+    let search_results = use_resource(move || {
+        let q = search_query();
+        async move {
+            if q.trim().is_empty() {
+                Ok(Vec::new())
+            } else {
+                search_products(q.into(), 8).await
+            }
+        }
+    });
+
     // Hämta kategorier från databasen för sidebaren
     let categories = use_resource(|| async move { category_trees().await.unwrap_or_default() });
 
@@ -78,13 +94,63 @@ pub fn Navbar() -> Element {
                             }
                         }
 
-                        // TODO(db): Koppla sökfältet till en produkt-query
+                        // Sökfält
                         div { class: "flex-grow max-w-2xl relative hidden md:block",
-                            i { class: "fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" }
+                            i { class: "fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10" }
                             input {
                                 r#type: "text",
                                 placeholder: "Sök på boop...",
+                                value: "{search_query}",
                                 class: "w-full py-2.5 pl-12 pr-4 rounded-full text-black bg-white focus:outline-none focus:ring-4 focus:ring-green-500/30 transition-all",
+                                oninput: move |e| {
+                                    search_query.set(e.value());
+                                    show_search_results.set(true);
+                                },
+                                onfocus: move |_| show_search_results.set(true),
+                            }
+
+                            // Sökning dropdown
+                            if show_search_results() && !search_query().trim().is_empty() {
+
+                                div {
+                                    class: "fixed inset-0 z-10",
+                                    onclick: move |_| show_search_results.set(false),
+                                }
+                                div { class: "absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-xl border z-20 overflow-hidden",
+                                    match &*search_results.read() {
+                                        None => rsx! {
+                                            div { class: "p-4 text-gray-400 text-sm animate-pulse", "Söker..." }
+                                        },
+                                        Some(Err(_)) => rsx! {
+                                            div { class: "p-4 text-red-400 text-sm", "Något gick fel." }
+                                        },
+                                        Some(Ok(results)) if results.is_empty() => rsx! {
+                                            div { class: "p-4 text-gray-400 text-sm", "Inga produkter hittades för \"{search_query}\"" }
+                                        },
+                                        Some(Ok(results)) => rsx! {
+                                            div { class: "py-2",
+                                                for result in results.iter() {
+                                                    Link {
+                                                        to: Route::Product {
+                                                            id: result.id.into(),
+                                                        },
+                                                        class: "flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition",
+                                                        onclick: move |_| {
+                                                            show_search_results.set(false);
+                                                            search_query.set(String::new());
+                                                        },
+                                                        img {
+                                                            src: "{result.thumbnail}",
+                                                            class: "w-10 h-10 rounded-lg object-cover bg-gray-100",
+                                                            alt: "{result.name}",
+                                                        }
+                                                        span { class: "text-gray-800 text-sm font-medium", "{result.name}" }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    }
+                                }
                             }
                         }
 

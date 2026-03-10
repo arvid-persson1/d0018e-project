@@ -3,6 +3,7 @@
 use crate::database::{Customer, Email, Id, ProfilePicture, Url, User, Username, Vendor};
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "server")]
 use {
     crate::database::{POOL, QueryResultExt},
@@ -232,5 +233,31 @@ pub async fn vendor_profile(id: Id<Vendor>) -> Result<VendorProfile> {
     .fetch_one(&*POOL)
     .await
     .map(Into::into)
+    .map_err(Into::into)
+}
+
+/// Vendor profile info for display.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VendorInfo {
+    /// Display name.
+    pub display_name: Box<str>,
+    /// Description.
+    pub description: Box<str>,
+}
+
+/// Get vendor profile info.
+#[server]
+pub async fn vendor_info(vendor: Id<Vendor>) -> Result<VendorInfo> {
+    query_as!(
+        VendorInfo,
+        "
+        SELECT display_name, description
+        FROM vendors
+        WHERE id = $1
+        ",
+        vendor.get(),
+    )
+    .fetch_one(&*POOL)
+    .await
     .map_err(Into::into)
 }

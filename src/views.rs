@@ -11,10 +11,10 @@ mod customer;
 pub use customer::CustomerProfile;
 pub use customer::CustomerProfile as ProfilePage;
 
-/// See [`VendorProfile`] / [`VendorPage`].
+/// See [`VendorPage`].
 mod vendor;
-pub use vendor::VendorProfile;
-pub use vendor::VendorProfile as VendorPage;
+pub use vendor::VendorPage;
+pub use vendor::VendorPage as Vendor;
 
 /// See [`CategoryPage`].
 mod category;
@@ -23,6 +23,10 @@ pub use category::CategoryPage;
 /// See [`FavoritesPage`].
 mod favorites;
 pub use favorites::FavoritesPage;
+
+/// See [`Search`].
+mod search;
+pub use search::Search;
 
 /// Auth views: Login, Register, VendorLogin, VendorRegister.
 mod auth;
