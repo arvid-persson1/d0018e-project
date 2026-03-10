@@ -72,7 +72,7 @@ pub async fn search_products(query: Box<str>, limit: usize) -> Result<Vec<Search
 }
 
 // TODO: Remove.
-// #[cfg(false)]
+#[cfg(false)]
 mod usage {
     use super::*;
     use dioxus_core::Task;
