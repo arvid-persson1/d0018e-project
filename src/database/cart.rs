@@ -1,6 +1,6 @@
 //! Database functions for interacting with a customer's shopping cart.
 
-use crate::database::{Customer, Deal, Id, Product, SpecialOffer, Url};
+use crate::database::{Customer, Deal, Id, Product, Url};
 use dioxus::prelude::*;
 use hashbrown::HashMap;
 use rust_decimal::Decimal;
@@ -261,8 +261,9 @@ pub async fn checkout(
     let expected_offers =
         expected_offers.map(|ids| ids.into_iter().map(Id::get).collect::<Box<_>>());
     query!(
-        "CALL checkout($1)",
+        "CALL checkout($1, $2)",
         customer.get(),
+        expected_offers.as_deref(),
     )
     .execute(&*POOL)
     .await

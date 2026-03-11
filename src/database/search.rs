@@ -72,6 +72,8 @@ pub async fn search_products(query: Box<str>, limit: usize) -> Result<Vec<Search
 }
 
 // TODO: Remove.
+#[cfg(feature = "web")]
+use gloo_timers as _;
 #[cfg(false)]
 mod usage {
     use super::*;
