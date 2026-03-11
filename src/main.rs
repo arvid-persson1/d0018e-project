@@ -119,6 +119,8 @@ fn App() -> Element {
                     }
                 }
             }
+            // Auth-checken är klar, oavsett resultat.
+            global_state.write().auth_loading = false;
         });
     });
     rsx! {

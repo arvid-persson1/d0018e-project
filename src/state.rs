@@ -11,11 +11,18 @@ pub struct CartItem {
 }
 
 /// Global state shared across the app.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct GlobalState {
     pub cart: Vec<CartItem>,
     pub favorites: Vec<i32>,
     pub login: Option<Login>,
+    pub auth_loading: bool,
+}
+
+impl Default for GlobalState {
+    fn default() -> Self {
+        Self { cart: Vec::new(), favorites: Vec::new(), login: None, auth_loading: true }
+    }
 }
 
 impl GlobalState {

@@ -1,6 +1,6 @@
 //! Database functions for interacting with a customer's shopping cart.
 
-use crate::database::{Customer, Deal, Id, Product, Url};
+use crate::database::{Customer, Deal, Id, Product, SpecialOffer, Url};
 use dioxus::prelude::*;
 use hashbrown::HashMap;
 use rust_decimal::Decimal;
@@ -99,7 +99,7 @@ pub async fn set_in_shopping_cart(
             "
             INSERT INTO shopping_cart_items (customer, product, number)
             VALUES ($1, $2, $3::INT)
-            ON CONFLICT (customer, product) DO UPDATE
+            ON CONFLICT (customer, product) WHERE product IS NOT NULL DO UPDATE
             SET number = EXCLUDED.number
             ",
             customer.get(),
@@ -108,7 +108,7 @@ pub async fn set_in_shopping_cart(
         )
         .execute(&*POOL)
         .await
-        .map(QueryResultExt::expect_one)
+        .map(QueryResultExt::allow_any)
         .map_err(Into::into)
     } else {
         todo!()
@@ -261,9 +261,8 @@ pub async fn checkout(
     let expected_offers =
         expected_offers.map(|ids| ids.into_iter().map(Id::get).collect::<Box<_>>());
     query!(
-        "CALL checkout($1, $2)",
+        "CALL checkout($1)",
         customer.get(),
-        expected_offers.as_deref(),
     )
     .execute(&*POOL)
     .await

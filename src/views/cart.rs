@@ -9,6 +9,7 @@ use dioxus::prelude::*;
 pub fn CartPage() -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
     let login = global_state.read().login.clone();
+    let auth_loading = global_state.read().auth_loading;
 
     let customer_id = login.as_ref().and_then(|l| {
         if let crate::database::LoginId::Customer(id) = l.id {
@@ -45,7 +46,12 @@ pub fn CartPage() -> Element {
                     "Kundvagn"
                 }
 
-                if checkout_done() {
+                if auth_loading {
+                    // Väntar på att login-checken ska bli klar
+                    div { class: "flex items-center justify-center py-20",
+                        i { class: "fa-solid fa-spinner fa-spin text-3xl text-green-600" }
+                    }
+                } else if checkout_done() {
                     div { class: "bg-green-50 border border-green-200 rounded-2xl p-8 text-center",
                         i { class: "fa-solid fa-circle-check text-5xl text-green-600 mb-4" }
                         h2 { class: "text-2xl font-black text-green-900 mb-2",

@@ -120,7 +120,7 @@ impl QueryResultExt for QueryResult {
     }
 
     fn procedure(self) {
-        assert!(self.rows_affected() != 0, "Query was not a procedure call.");
+        assert!(self.rows_affected() == 0, "Query was not a procedure call.");
     }
 
     #[expect(clippy::unreachable, reason = "Key enforces uniqueness.")]
