@@ -261,9 +261,8 @@ pub async fn checkout(
     let expected_offers =
         expected_offers.map(|ids| ids.into_iter().map(Id::get).collect::<Box<_>>());
     query!(
-        "CALL checkout($1, $2)",
+        "CALL checkout($1)",
         customer.get(),
-        expected_offers.as_deref(),
     )
     .execute(&*POOL)
     .await

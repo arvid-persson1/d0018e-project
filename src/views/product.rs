@@ -1,6 +1,7 @@
 use crate::Route;
 use crate::components::product_card::ProductCard;
 use crate::database::products::{product_info, products_by_category};
+use crate::database::cart::set_in_shopping_cart;
 use crate::database::{Category, Id, Product as DbProduct};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
@@ -22,7 +23,6 @@ pub fn Product(id: i32) -> Element {
     let mut selected_rating = use_signal(|| 0_u8);
     let max_chars = 300;
 
-    // TODO(auth): Skicka med inloggad kunds ID: Some(customer_id)
     let product_resource = use_resource(move || async move { product_info(None, db_id).await });
 
     let is_favorite = global_state.read().favorites.contains(&id);
@@ -45,6 +45,8 @@ pub fn Product(id: i32) -> Element {
     let s3 = if selected_rating() >= 3 { "text-yellow-400" } else { "text-gray-300" };
     let s4 = if selected_rating() >= 4 { "text-yellow-400" } else { "text-gray-300" };
     let s5 = if selected_rating() >= 5 { "text-yellow-400" } else { "text-gray-300" };
+
+    
 
     rsx! {
         div { class: "max-w-6xl mx-auto p-4 md:p-8 bg-white",
@@ -84,7 +86,6 @@ pub fn Product(id: i32) -> Element {
                         .map(|u| u.to_string())
                         .unwrap_or_default();
 
-                    // Hämta kategori-ID från produktens kategoriväg (sista = mest specifik)
                     let category_id = product.category.last().map(|(cat_id, _)| *cat_id);
 
                     rsx! {
@@ -130,6 +131,13 @@ pub fn Product(id: i32) -> Element {
                                             class: "flex-grow h-full bg-green-700 text-white rounded-full font-black text-xl hover:bg-green-800 transition-colors shadow-md flex items-center justify-center gap-3",
                                             onclick: move |_| {
                                                 global_state.write().add_to_cart(id, pname.clone(), pprice, pimage.clone());
+                                                if let Some(cid) = global_state.read().customer_id() {
+                                                    let pid = Id::<DbProduct>::from(id);
+                                                    #[allow(unused_results)]
+                                                    spawn(async move {
+                                                        drop(set_in_shopping_cart(cid, pid, 1).await);
+                                                    });
+                                                }
                                             },
                                             i { class: "fa-solid fa-cart-plus" }
                                             "LÄGG I VARUKORG"
@@ -139,7 +147,15 @@ pub fn Product(id: i32) -> Element {
                                             button {
                                                 class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
                                                 onclick: move |_| {
-                                                    global_state.write().set_quantity(id, quantity - 1);
+                                                    let new_qty = quantity - 1;
+                                                    global_state.write().set_quantity(id, new_qty);
+                                                    if let Some(cid) = global_state.read().customer_id() {
+                                                        let pid = Id::<DbProduct>::from(id);
+                                                        #[allow(unused_results)]
+                                                        spawn(async move {
+                                                            drop(set_in_shopping_cart(cid, pid, new_qty).await);
+                                                        });
+                                                    }
                                                 },
                                                 i { class: "fas fa-minus" }
                                             }
@@ -147,7 +163,15 @@ pub fn Product(id: i32) -> Element {
                                             button {
                                                 class: "px-8 h-full bg-green-700 text-white font-bold text-2xl",
                                                 onclick: move |_| {
-                                                    global_state.write().set_quantity(id, quantity + 1);
+                                                    let new_qty = quantity + 1;
+                                                    global_state.write().set_quantity(id, new_qty);
+                                                    if let Some(cid) = global_state.read().customer_id() {
+                                                        let pid = Id::<DbProduct>::from(id);
+                                                        #[allow(unused_results)]
+                                                        spawn(async move {
+                                                            drop(set_in_shopping_cart(cid, pid, new_qty).await);
+                                                        });
+                                                    }
                                                 },
                                                 i { class: "fas fa-plus" }
                                             }
@@ -169,7 +193,6 @@ pub fn Product(id: i32) -> Element {
                             }
                         }
 
-                        // Liknande produkter – hämtas från samma kategori, exkluderar denna produkt
                         div { class: "border-t pt-16 mb-16",
                             h2 { class: "text-3xl font-black mb-8 text-gray-900", "Liknande produkter" }
                             if let Some(cat_id) = category_id {
@@ -182,7 +205,6 @@ pub fn Product(id: i32) -> Element {
                 }
             }
 
-            // Recensions-sektion
             div { class: "max-w-3xl",
                 h2 { class: "text-2xl font-black mb-8", "Vad tycker andra kunder?" }
                 div { class: "bg-green-50 p-6 rounded-2xl mb-10 border border-green-100",
@@ -225,7 +247,6 @@ pub fn Product(id: i32) -> Element {
                             class: "bg-green-700 text-white px-8 py-3 rounded-full font-bold hover:bg-green-800 transition shadow-sm disabled:opacity-30 disabled:cursor-not-allowed",
                             disabled: selected_rating() == 0,
                             onclick: move |_| {
-                                // TODO(db): Ersätt med create_review(customer_id, product_id, rating, text)
                                 println!("Betyg: {}", selected_rating());
                             },
                             "Skicka recension"

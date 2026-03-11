@@ -71,7 +71,23 @@ pub fn Login() -> Element {
                                                 && let Ok(id) = value.parse::<RawId>()
                                             {
                                                 if let Ok(info) = login_info(Id::<User>::from(id)).await {
+                                                    let local_cart = gs.read().cart.clone();
                                                     gs.write().login = Some(info);
+                                                    if let Some(cid) = gs.read().customer_id() {
+                                                        for item in local_cart {
+                                                            let pid = crate::database::Id::<
+                                                                crate::database::Product,
+                                                            >::from(item.product_id);
+                                                            drop(
+                                                                crate::database::cart::set_in_shopping_cart(
+                                                                        cid,
+                                                                        pid,
+                                                                        item.quantity,
+                                                                    )
+                                                                    .await,
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -289,7 +305,23 @@ pub fn VendorLogin() -> Element {
                                                 && let Ok(id) = value.parse::<RawId>()
                                             {
                                                 if let Ok(info) = login_info(Id::<User>::from(id)).await {
+                                                    let local_cart = gs.read().cart.clone();
                                                     gs.write().login = Some(info);
+                                                    if let Some(cid) = gs.read().customer_id() {
+                                                        for item in local_cart {
+                                                            let pid = crate::database::Id::<
+                                                                crate::database::Product,
+                                                            >::from(item.product_id);
+                                                            drop(
+                                                                crate::database::cart::set_in_shopping_cart(
+                                                                        cid,
+                                                                        pid,
+                                                                        item.quantity,
+                                                                    )
+                                                                    .await,
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }

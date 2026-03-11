@@ -78,18 +78,11 @@ pub fn CategoryPage(id: Id<CategoryMarker>) -> Element {
                             if id == Id::<CategoryMarker>::from(0) || id == tree.id {
                                 // Samla ihop alla underkategori-IDs (inklusive tree.id självt)
                                 {
-                                    let mut all_cat_ids = vec![tree.id];
-                                    for sub in tree.subcategories.iter() {
-                                        all_cat_ids.push(sub.id);
-                                        for subsub in sub.subcategories.iter() {
-                                            all_cat_ids.push(subsub.id);
-                                        }
-                                    }
                                     rsx! {
                                         CategorySection {
                                             cat_id: tree.id,
                                             cat_name: tree.name.clone().into(),
-                                            all_cat_ids,
+                                            all_cat_ids: vec![tree.id],
                                             show_all: id != Id::<CategoryMarker>::from(0),
                                             scroll_index: i,
                                         }
@@ -142,7 +135,7 @@ fn CategorySection(props: CategorySectionProps) -> Element {
                 }
             }
             // Begränsa totalt antal
-            all_products.truncate(if show_all { 50 } else { 12 });
+            all_products.truncate(if show_all { 200 } else { 40 });
             all_products
         }
     });

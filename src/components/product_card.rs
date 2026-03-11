@@ -81,6 +81,24 @@ pub fn ProductCard(props: ProductProps) -> Element {
                                     product_price,
                                     product_image.clone(),
                                 );
+                            if let Some(cid) = global_state.read().customer_id() {
+                                let new_qty = global_state
+                                    .read()
+                                    .cart
+                                    .iter()
+                                    .find(|i| i.product_id == product_id)
+                                    .map(|i| i.quantity)
+                                    .unwrap_or(1);
+                                #[allow(unused_results)]
+                                spawn(async move {
+                                    let pid = crate::database::Id::<
+                                        crate::database::Product,
+                                    >::from(product_id);
+                                    drop(
+                                        crate::database::cart::set_in_shopping_cart(cid, pid, new_qty).await,
+                                    );
+                                });
+                            }
                         },
                         i { class: "fas fa-shopping-cart" }
                     }
@@ -89,7 +107,19 @@ pub fn ProductCard(props: ProductProps) -> Element {
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
-                                global_state.write().set_quantity(product_id, quantity - 1);
+                                let new_qty = quantity - 1;
+                                global_state.write().set_quantity(product_id, new_qty);
+                                if let Some(cid) = global_state.read().customer_id() {
+                                    #[allow(unused_results)]
+                                    spawn(async move {
+                                        let pid = crate::database::Id::<
+                                            crate::database::Product,
+                                        >::from(product_id);
+                                        drop(
+                                            crate::database::cart::set_in_shopping_cart(cid, pid, new_qty).await,
+                                        );
+                                    });
+                                }
                             },
                             i { class: "fas fa-minus" }
                         }
@@ -97,7 +127,19 @@ pub fn ProductCard(props: ProductProps) -> Element {
                         button {
                             class: "px-4 py-2 bg-green-700 text-white font-bold",
                             onclick: move |_| {
-                                global_state.write().set_quantity(product_id, quantity + 1);
+                                let new_qty = quantity + 1;
+                                global_state.write().set_quantity(product_id, new_qty);
+                                if let Some(cid) = global_state.read().customer_id() {
+                                    #[allow(unused_results)]
+                                    spawn(async move {
+                                        let pid = crate::database::Id::<
+                                            crate::database::Product,
+                                        >::from(product_id);
+                                        drop(
+                                            crate::database::cart::set_in_shopping_cart(cid, pid, new_qty).await,
+                                        );
+                                    });
+                                }
                             },
                             i { class: "fas fa-plus" }
                         }

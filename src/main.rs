@@ -16,7 +16,7 @@ use state::GlobalState;
 use dioxus::prelude::*;
 use views::{
     Administration, CategoryPage, CustomerProfile, FavoritesPage, Home, Login, Product,
-    ProfilePage, Register, Search, VendorLogin, VendorPage, VendorRegister,
+    ProfilePage, Register, Search, VendorLogin, VendorPage, VendorRegister, CartPage,
 };
 
 /// Structure of all non-internal endpoints.
@@ -75,7 +75,9 @@ enum Route {
     /// See [`Administration`].
     #[route("/admin", Administration)]
     Administration,
-    // TODO: Shopping cart page.
+    /// Se [`CartPage`].
+    #[route("/cart", CartPage)]
+    Cart,
 }
 
 #[allow(non_snake_case)]
@@ -105,7 +107,6 @@ fn App() -> Element {
                         match login_info(Id::<User>::from(id)).await {
                             Ok(info) => {
                                 global_state.write().login = Some(info);
-
                                 let customer_id = global_state.read().customer_id();
                                 if let Some(customer_id) = customer_id {
                                     if let Ok(favs) = crate::database::products::favorites(customer_id, 1000, 0).await {

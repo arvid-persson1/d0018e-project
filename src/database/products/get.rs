@@ -305,8 +305,7 @@ impl From<ProductReprVendor> for ProductOverviewVendor {
                 .expect("Database returned negative stock."),
             amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             origin: origin.into(),
-            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
-                .expect("Database returned invalid special offer."),
+            special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price).unwrap_or(None),
             special_offer_members_only: members_only,
             favorited,
         }
@@ -446,6 +445,12 @@ pub async fn products_by_category(
     query_as!(
         ProductRepr,
         r#"
+        WITH RECURSIVE subcategories AS (
+            SELECT id FROM categories WHERE id = $2
+            UNION ALL
+            SELECT c.id FROM categories c
+            JOIN subcategories sc ON c.parent = sc.id
+        )
         SELECT p.id, name, thumbnail, price, overview, in_stock, origin, amount_per_unit, measurement_unit,
             new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             display_name AS vendor_name,
@@ -457,8 +462,8 @@ pub async fn products_by_category(
         FROM products p
         LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
-        WHERE visible AND category = $2 AND in_stock > 0 AND ($3::INT IS NULL OR p.id != $3)
-        ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC
+        WHERE visible AND category IN (SELECT id FROM subcategories) AND in_stock > 0 AND ($3::INT IS NULL OR p.id != $3)
+        ORDER BY p.name
         LIMIT $4
         OFFSET $5
         "#,
@@ -471,13 +476,6 @@ pub async fn products_by_category(
     .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::<ProductOverview>::into).collect::<Box<_>>())
-    .inspect(|products| {
-        debug_assert!(
-            products.is_sorted_by_key(|ProductOverview { special_offer_deal, price, .. }|
-                Reverse(special_offer_deal.map(|deal| deal.average_discount(*price)))
-            )
-        );
-    })
     .map_err(Into::into)
 }
 
@@ -565,8 +563,8 @@ pub async fn vendor_products(
             ) AS "favorited!"
         FROM products p
         LEFT JOIN active_special_offers ON product = p.id
-        WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0
-        ORDER BY average_discount(p.price, new_price, quantity1, quantity2) DESC, p.name
+        WHERE (p.visible OR $5) AND p.vendor = $2
+        ORDER BY p.name
         LIMIT $3
         OFFSET $4
         "#,
@@ -579,13 +577,6 @@ pub async fn vendor_products(
     .fetch_all(&*POOL)
     .await
     .map(|products| products.into_iter().map(Into::<ProductOverviewVendor>::into).collect::<Box<_>>())
-    .inspect(|products| {
-        debug_assert!(
-            products.is_sorted_by_key(|ProductOverviewVendor { special_offer_deal, price, .. }|
-                Reverse(special_offer_deal.map(|deal| deal.average_discount(*price)))
-            )
-        );
-    })
     .map_err(Into::into)
 }
 

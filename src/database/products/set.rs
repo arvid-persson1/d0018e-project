@@ -377,7 +377,7 @@ pub async fn set_visibility(product: Id<Product>, visible: bool) -> Result<()> {
     query!("CALL set_visibility($1, $2)", product.get(), visible)
         .execute(&*POOL)
         .await
-        .map(QueryResultExt::procedure)
+        .map(QueryResultExt::allow_any)
         .map_err(Into::into)
 }
 

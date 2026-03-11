@@ -204,7 +204,7 @@ pub async fn login_info(user: Id<User>) -> Result<Login> {
     .fetch_one(&*POOL)
     .await
     .map(|repr| Login::from_repr(user, repr))
-    .map_err(|_| todo!())
+    .map_err(Into::into)
 }
 
 /// Information about a login session.
