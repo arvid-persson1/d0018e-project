@@ -118,8 +118,8 @@ BEGIN
         WHEN EXISTS(SELECT 1 FROM administrators WHERE administrators.id = role_of.id) 
             THEN role := 'administrator';
         WHEN NOT EXISTS(SELECT 1 FROM users WHERE users.id = role_of.id)
-            THEN RAISE EXCEPTION 'User does not exist.';
-        ELSE RAISE EXCEPTION 'User does not exist or unknown role.';
+            THEN RAISE EXCEPTION 'User % does not exist.', id;
+        ELSE RAISE EXCEPTION 'User % is of no or unknown role.', id;
     END CASE;
 
     RETURN role;
@@ -161,7 +161,7 @@ BEGIN
           + EXISTS (SELECT 1 FROM administrators WHERE id = user_id)::INT
          != 1
     THEN
-        RAISE EXCEPTION 'User must have exactly one role.';
+        RAISE EXCEPTION 'User (%) must have exactly one role.', user_id;
     END IF;
 
     RETURN NEW;
@@ -246,10 +246,10 @@ CREATE TABLE categories (
 CREATE INDEX categories_by_parent_name ON categories (parent NULLS FIRST, name);
 
 CREATE TYPE CATEGORY_PATH_SEGMENT AS (id INT, name TEXT);
-CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS category_path_segment[]
+CREATE FUNCTION category_path(start_id categories.id%TYPE) RETURNS CATEGORY_PATH_SEGMENT[]
 LANGUAGE plpgsql STRICT PARALLEL SAFE AS $$
 DECLARE
-    path category_path_segment[] := ARRAY[]::category_path_segment[];
+    path category_path_segment[] := ARRAY[]::CATEGORY_PATH_SEGMENT[];
     current_id categories.id%TYPE := start_id;
     current_name categories.name%TYPE;
     current_parent categories.parent%TYPE;
@@ -259,13 +259,16 @@ BEGIN
     FROM categories
     ORDER BY id
     FOR SHARE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Category % does not exist.', start_id;
+    END IF;
 
     LOOP
         SELECT id, name, parent
         INTO STRICT current_id, current_name, current_parent
         FROM categories WHERE id = current_id;
-        IF EXISTS (SELECT 1 FROM unnest(path) WHERE id = current_id) THEN
-            RAISE EXCEPTION 'Cycle detected.';
+        IF EXISTS (SELECT 1 FROM UNNEST(path) WHERE id = current_id) THEN
+            RAISE EXCEPTION 'Cycle detected in path of category %.', start_id;
         END IF;
 
         path := path || (current_id, current_name)::CATEGORY_PATH_SEGMENT;
@@ -402,7 +405,7 @@ SELECT *
 FROM special_offers
 WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
 
-CREATE FUNCTION average_discount(
+CREATE OR REPLACE FUNCTION average_discount(
     base_price products.price%TYPE,
     new_price special_offers.new_price%TYPE,
     quantity1 special_offers.quantity1%TYPE,
@@ -415,7 +418,7 @@ BEGIN
     -- Variant 1.
     IF new_price IS NOT NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
         IF new_price >= base_price THEN
-            RAISE EXCEPTION 'New price is not less than base price.';
+            RAISE EXCEPTION 'New price (%) is not less than base price (%).', new_price, base_price;
         END IF;
         
         IF base_price = 0 THEN
@@ -426,19 +429,19 @@ BEGIN
     -- Variant 2.
     ELSIF new_price IS NULL AND quantity1 IS NOT NULL AND quantity2 IS NOT NULL THEN
         IF quantity1 <= 1 THEN
-            RAISE EXCEPTION 'Must be asked to take more than 1.';
+            RAISE EXCEPTION 'Must be asked to take more than 1 (found %).', quantity1;
         ELSIF quantity2 < 1 THEN
-            RAISE EXCEPTION 'Must be asked to pay for at least 1.';
+            RAISE EXCEPTION 'Must be asked to pay for at least 1 (found 0).';
         ELSIF quantity1 <= quantity2 THEN
-            RAISE EXCEPTION 'Must be asked to pay for less than taken.';
+            RAISE EXCEPTION 'Must be asked to pay for less than taken (found % for the price of %).', quantity1, quantity2;
         END IF;
         discount := 1 - quantity2::TWOPOINT_UDEC / quantity1::TWOPOINT_UDEC;
     -- Variant 3.
     ELSIF new_price IS NOT NULL AND quantity1 IS NOT NULL AND quantity2 IS NULL THEN
         IF quantity1 <= 1 THEN
-            RAISE EXCEPTION 'Must be asked to take more than 1.';
+            RAISE EXCEPTION 'Must be asked to take more than 1 (found %).', quantity1;
         ELSIF new_price >= base_price * quantity1 THEN
-            RAISE EXCEPTION 'Must be asked to pay less in bulk.';
+            RAISE EXCEPTION 'Must be asked to pay less in bulk (found % for %).', quantity1, new_price;
         END IF;
         
         IF base_price = 0 THEN
@@ -584,7 +587,7 @@ BEGIN
     WHERE id = product_id
     FOR KEY SHARE;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Product does not exist.';
+        RAISE EXCEPTION 'Product % does not exist.', product_id;
     END IF;
 
     IF expiry IS NOT NULL THEN
@@ -607,14 +610,14 @@ CREATE FUNCTION sale_remove_expiries(
     product_id expiries.product%TYPE,
     number INT
 ) RETURNS INT
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql STRICT AS $$
 DECLARE
     remaining INT := number;
     current_date expiries.expiry%TYPE;
     current_number expiries.number%TYPE;
 BEGIN
     IF remaining < 0 THEN
-        RAISE EXCEPTION 'Can''t sell negative number.';
+        RAISE EXCEPTION 'Sold units must be non-negative (found %).', remanining;
     END IF;
 
     FOR current_date, current_number IN
@@ -656,7 +659,7 @@ CREATE FUNCTION rater_has_purchase() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM orders WHERE customer = NEW.customer AND product = NEW.product) THEN
-        RAISE EXCEPTION 'Customer must have previously bought the product to rate it.';
+        RAISE EXCEPTION 'Customer (%) must have previously bought the product to rate it.', NEW.customer;
     END IF;
 
     RETURN NEW;
@@ -695,7 +698,7 @@ CREATE FUNCTION reviewer_can_review() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF NOT (SELECT can_review FROM customers WHERE id = NEW.customer) THEN
-        RAISE EXCEPTION 'Customer must be able to place reviews.';
+        RAISE EXCEPTION 'Customer (%) must be able to place reviews.', NEW.customer;
     END IF;
 
     RETURN NEW;
@@ -717,7 +720,7 @@ CREATE FUNCTION no_vote_on_own_review() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF NEW.customer = (SELECT customer FROM reviews WHERE id = NEW.review) THEN
-        RAISE EXCEPTION 'Can''t vote on own review.';
+        RAISE EXCEPTION 'Customer (%) can not vote on their own review.', NEW.customer;
     END IF;
 
     RETURN NEW;
@@ -759,7 +762,7 @@ BEGIN
     IF NEW.parent IS NOT NULL
         AND NEW.review != (SELECT review FROM comments WHERE id = NEW.parent)
     THEN
-        RAISE EXCEPTION 'Parent comment must belong to same review as all children.';
+        RAISE EXCEPTION 'Reply (%) must belong to the same review (%) as its parent (%).', NEW.id, NEW.review, NEW.parent;
     END IF;
 
     RETURN NEW;
@@ -779,7 +782,7 @@ DECLARE
 BEGIN
     WHILE current_id IS NOT NULL LOOP
         IF current_id = ANY(visited) THEN
-            RAISE EXCEPTION 'Cycle detected.';
+            RAISE EXCEPTION 'Cycle detected in path of comment %.', NEW.id;
         END IF;
         visited := visited || current_id;
 
@@ -809,7 +812,7 @@ CREATE FUNCTION no_vote_on_own_comment() RETURNS TRIGGER
 LANGUAGE plpgsql STABLE AS $$
 BEGIN
     IF NEW.customer = (SELECT customer FROM comments WHERE id = NEW.comment) THEN
-        RAISE EXCEPTION 'Can''t vote on own comment.';
+        RAISE EXCEPTION 'Customer (%) can not vote on their own comment.', NEW.customer;
     END IF;
 
     RETURN NEW;
@@ -914,7 +917,7 @@ BEGIN
     SET deleted = true
     WHERE id = id;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'User does not exist.';
+        RAISE EXCEPTION 'User % does not exist.', id;
     END IF;
 
     -- PERF: Several of these queries are not supported by indices: we imagine account deletions
@@ -995,7 +998,7 @@ BEGIN
     WHERE id = customer_id
     FOR KEY SHARE;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Customer does not exist.';
+        RAISE EXCEPTION 'Customer % does not exist.', customer_id;
     END IF;
 
     CREATE TEMP TABLE items
@@ -1007,7 +1010,7 @@ BEGIN
         ORDER BY product
         FOR UPDATE
     ),
-    WITH deleted AS (
+    deleted AS (
         DELETE FROM shopping_cart_items
         WHERE customer = customer_id
         RETURNING product, number
@@ -1025,6 +1028,7 @@ BEGIN
     ORDER BY p.id
     FOR SHARE;
 
+    -- TODO: Report product ID.
     IF EXISTS (
         SELECT 1
         FROM items
