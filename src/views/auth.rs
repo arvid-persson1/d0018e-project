@@ -1,13 +1,20 @@
 #![allow(non_snake_case)]
-use crate::Route;
-use crate::database::{NewUserData, create_user, log_in, login_info, Id, RawId, User, Username, Email};
-use crate::state::GlobalState;
+
+#[cfg(feature = "web")]
+use crate::database::{Id, RawId, User, login_info};
+use crate::{
+    Route,
+    database::{Email, NewUserData, Username, create_user, log_in},
+    state::GlobalState,
+};
 use dioxus::prelude::*;
 
 /// Kundinloggning
 #[component]
 pub fn Login() -> Element {
-    let global_state = use_context::<Signal<GlobalState>>();
+    #[cfg_attr(not(feature = "web"), expect(unused_mut, unused_variables))]
+    let mut global_state = use_context::<Signal<GlobalState>>();
+
     let nav = use_navigator();
 
     let mut username_val = use_signal(String::new);
@@ -44,7 +51,6 @@ pub fn Login() -> Element {
                         onclick: move |_| {
                             let uname = username_val();
                             let pwd = password_val();
-                            let mut gs = global_state;
                             let nav = nav.clone();
                             let _task = spawn(async move {
                                 loading.set(true);
@@ -71,7 +77,7 @@ pub fn Login() -> Element {
                                                 && let Ok(id) = value.parse::<RawId>()
                                             {
                                                 if let Ok(info) = login_info(Id::<User>::from(id)).await {
-                                                    gs.write().login = Some(info);
+                                                    global_state.write().login = Some(info);
                                                 }
                                             }
                                         }
@@ -225,7 +231,9 @@ pub fn Register() -> Element {
 /// Företagsinloggning
 #[component]
 pub fn VendorLogin() -> Element {
-    let global_state = use_context::<Signal<GlobalState>>();
+    #[cfg_attr(not(feature = "web"), expect(unused_mut, unused_variables))]
+    let mut global_state = use_context::<Signal<GlobalState>>();
+
     let nav = use_navigator();
 
     let mut username_val = use_signal(String::new);
@@ -262,7 +270,6 @@ pub fn VendorLogin() -> Element {
                         onclick: move |_| {
                             let uname = username_val();
                             let pwd = password_val();
-                            let mut gs = global_state;
                             let nav = nav.clone();
                             let _task = spawn(async move {
                                 loading.set(true);
@@ -289,7 +296,7 @@ pub fn VendorLogin() -> Element {
                                                 && let Ok(id) = value.parse::<RawId>()
                                             {
                                                 if let Ok(info) = login_info(Id::<User>::from(id)).await {
-                                                    gs.write().login = Some(info);
+                                                    global_state.write().login = Some(info);
                                                 }
                                             }
                                         }
@@ -449,3 +456,4 @@ pub fn VendorRegister() -> Element {
         }
     }
 }
+

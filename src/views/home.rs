@@ -138,6 +138,7 @@ fn DiscountedSlider(props: DiscountedSliderProps) -> Element {
                                 name: p.name.to_string(),
                                 price: p.special_offer_deal
                                     .database_repr()
+                                    .ok()
                                     .and_then(|(new_price, _, _)| new_price)
                                     .and_then(|np| np.to_f64())
                                     .unwrap_or_else(|| p.price.to_f64().unwrap_or_default()),
@@ -257,3 +258,4 @@ fn NewestSlider(props: NewestSliderProps) -> Element {
         }
     }
 }
+

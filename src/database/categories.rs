@@ -153,5 +153,6 @@ pub async fn delete_category(category: Id<Category>) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }

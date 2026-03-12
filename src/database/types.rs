@@ -9,7 +9,7 @@ use sqlx::Type;
 use std::{
     cmp::Ordering,
     fmt::{Display, Error as FmtError, Formatter},
-    num::{NonZero, NonZeroU8, NonZeroU32},
+    num::{NonZero, NonZeroU8, NonZeroU32, TryFromIntError},
     sync::LazyLock,
 };
 use thiserror::Error;
@@ -511,27 +511,27 @@ impl Deal {
     /// Convert a `Deal` into the format used in the database.
     ///
     /// Specifically, this returns a tuple representing the columns  `new_price`, `quantity1` and
-    /// `quantity2` respectively on success. If either quantity is greater than `i32::MAX`, `None`
-    /// is returned.
+    /// `quantity2` respectively on success.
+    ///
+    /// # Errors
+    ///
+    /// Fails if either quantity is greater than `i32::MAX`.
     #[allow(clippy::option_if_let_else, reason = "match arm clarity")]
     #[must_use]
-    pub fn database_repr(self) -> Option<(Option<Decimal>, Option<i32>, Option<i32>)> {
+    pub fn database_repr(
+        self,
+    ) -> Result<(Option<Decimal>, Option<i32>, Option<i32>), TryFromIntError> {
         let Self(deal) = self;
         match deal {
-            DealImpl::Discount { new_price } => Some((Some(new_price), None, None)),
+            DealImpl::Discount { new_price } => Ok((Some(new_price), None, None)),
             DealImpl::Batch { take, pay_for } => {
-                if let Ok(take) = take.get().try_into()
-                    && let Ok(pay_for) = pay_for.get().try_into()
-                {
-                    Some((None, Some(take), Some(pay_for)))
-                } else {
-                    None
-                }
+                let take = take.get().try_into()?;
+                let pay_for = pay_for.get().try_into()?;
+                Ok((None, Some(take), Some(pay_for)))
             },
             DealImpl::BatchPrice { take, pay } => take
                 .get()
                 .try_into()
-                .ok()
                 .map(|take| (Some(pay), Some(take), None)),
         }
     }

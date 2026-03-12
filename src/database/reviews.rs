@@ -728,7 +728,8 @@ pub async fn update_review(review: Id<Review>, title: Box<str>, content: Box<str
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Delete a review and all comments on it.
@@ -752,7 +753,8 @@ pub async fn delete_review(review: Id<Review>) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Create a comment on a review.
@@ -821,7 +823,8 @@ pub async fn delete_comment(comment: Id<Comment>) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the customer's vote status on a review. Setting `vote = None` removes the vote.
@@ -864,7 +867,8 @@ pub async fn set_vote_review(
         )
         .execute(&*POOL)
         .await?
-        .by_unique_key(|| todo!())
+        .by_unique_key()
+        .map_err(Into::into)
     }
 }
 
@@ -908,7 +912,8 @@ pub async fn set_vote_comment(
         )
         .execute(&*POOL)
         .await?
-        .by_unique_key(|| todo!())
+        .by_unique_key()
+        .map_err(Into::into)
     }
 }
 

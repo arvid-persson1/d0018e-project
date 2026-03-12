@@ -50,7 +50,8 @@ pub async fn set_customer_profile_picture(customer: Id<Customer>, url: Url) -> R
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set a vendor's profile picture.
@@ -73,7 +74,8 @@ pub async fn set_vendor_profile_picture(vendor: Id<Vendor>, url: Url) -> Result<
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set a user's username.
@@ -97,7 +99,8 @@ pub async fn set_username(user: Id<User>, username: Username) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set a user's email.
@@ -121,7 +124,8 @@ pub async fn set_email(user: Id<User>, email: Email) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set a vendor's display name.
@@ -144,7 +148,8 @@ pub async fn set_vendor_display_name(vendor: Id<Vendor>, display_name: Box<str>)
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set a vendor's description.
@@ -167,7 +172,8 @@ pub async fn set_vendor_description(vendor: Id<Vendor>, description: Box<str>) -
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Information about a vendor, for display on their profile page.

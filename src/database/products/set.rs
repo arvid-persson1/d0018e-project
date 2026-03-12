@@ -82,7 +82,8 @@ pub async fn set_product_name(product: Id<Product>, name: Box<str>) -> Result<()
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the thumbnail of a product.
@@ -105,7 +106,8 @@ pub async fn set_thumbnail(product: Id<Product>, url: Url) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Get the gallery of a product.
@@ -157,7 +159,8 @@ pub async fn set_gallery(product: Id<Product>, gallery: Box<[Url]>) -> Result<()
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Append to the gallery of a product.
@@ -180,7 +183,8 @@ pub async fn add_to_gallery(product: Id<Product>, additions: Box<[Url]>) -> Resu
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the price of a product.
@@ -204,7 +208,8 @@ pub async fn set_price(product: Id<Product>, price: Decimal) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the overview of a product.
@@ -227,7 +232,8 @@ pub async fn set_overview(product: Id<Product>, overview: Box<str>) -> Result<()
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the description of a product.
@@ -250,7 +256,8 @@ pub async fn set_description(product: Id<Product>, description: Box<str>) -> Res
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the category of a product.
@@ -273,7 +280,8 @@ pub async fn set_category(product: Id<Product>, category: Id<Category>) -> Resul
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the amount per unit of a product.
@@ -297,7 +305,8 @@ pub async fn set_amount(product: Id<Product>, amount: Amount) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the origin of a product.
@@ -320,7 +329,8 @@ pub async fn set_origin(product: Id<Product>, origin: Box<str>) -> Result<()> {
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Add units to stock.
@@ -471,5 +481,6 @@ pub async fn remove_rating(customer: Id<Customer>, product: Id<Product>) -> Resu
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }

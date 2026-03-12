@@ -94,7 +94,7 @@ pub async fn set_in_shopping_cart(
         .await
         .map(QueryResultExt::expect_maybe)
         .map_err(Into::into)
-    } else if let Ok(number) = i32::try_from(number) {
+    } else {
         query!(
             "
             INSERT INTO shopping_cart_items (customer, product, number)
@@ -104,14 +104,12 @@ pub async fn set_in_shopping_cart(
             ",
             customer.get(),
             product.get(),
-            number,
+            i32::try_from(number)?,
         )
         .execute(&*POOL)
         .await
         .map(QueryResultExt::expect_one)
         .map_err(Into::into)
-    } else {
-        todo!()
     }
 }
 

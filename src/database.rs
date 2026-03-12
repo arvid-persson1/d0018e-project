@@ -12,6 +12,7 @@
 use {
     crate::dioxus_fullstack::Lazy,
     sqlx::{PgPool as Pool, postgres::PgQueryResult as QueryResult, query},
+    thiserror::Error,
 };
 
 mod types;
@@ -56,6 +57,11 @@ static POOL: Lazy<Pool> = Lazy::new(|| async move {
     Ok::<_, !>(pool)
 });
 
+#[cfg(feature = "server")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Error)]
+#[error("The provided key was invalid.")]
+struct InvalidKey;
+
 /// Extension trait to make decisions based on the number of rows affected by a query.
 ///
 /// See [`QueryResult`].
@@ -99,7 +105,7 @@ trait QueryResultExt: Sized {
     ///
     /// Panics if the query affected multiple rows, i.e. the key wasn't unique.
     // TODO: Have this return `CapturedError` and perform conversion in the method.
-    fn by_unique_key<E>(self, on_zero: impl FnOnce() -> E) -> Result<(), E>;
+    fn by_unique_key(self) -> Result<(), InvalidKey>;
 }
 
 #[cfg(feature = "server")]
@@ -124,9 +130,9 @@ impl QueryResultExt for QueryResult {
     }
 
     #[expect(clippy::unreachable, reason = "Key enforces uniqueness.")]
-    fn by_unique_key<E>(self, on_zero: impl FnOnce() -> E) -> Result<(), E> {
+    fn by_unique_key(self) -> Result<(), InvalidKey> {
         match self.rows_affected() {
-            0 => Err(on_zero()),
+            0 => Err(InvalidKey),
             1 => Ok(()),
             _ => unreachable!("Non-unique key."),
         }

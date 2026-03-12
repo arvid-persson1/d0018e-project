@@ -135,9 +135,7 @@ fn CategorySection(props: CategorySectionProps) -> Element {
             let limit_per_cat = if show_all { 50 } else { 12 };
             let mut all_products = Vec::new();
             for cid in cat_ids {
-                if let Ok(mut prods) =
-                    products_by_category(None, cid, None, limit_per_cat, 0).await
-                {
+                if let Ok(prods) = products_by_category(None, cid, None, limit_per_cat, 0).await {
                     all_products.extend(prods.iter().cloned());
                 }
             }
@@ -263,3 +261,4 @@ fn CategorySection(props: CategorySectionProps) -> Element {
         }
     }
 }
+

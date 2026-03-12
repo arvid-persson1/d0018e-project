@@ -37,7 +37,7 @@ pub async fn create_special_offer(
     // NOTE: `valid_until` intentionally not checked for being in the past as even then the database
     // might see it at a later time where it then is in the past.
 
-    let (new_price, quantity1, quantity2) = deal.database_repr().ok_or_else(|| todo!())?;
+    let (new_price, quantity1, quantity2) = deal.database_repr()?;
 
     query!(
         "
@@ -92,7 +92,8 @@ pub async fn set_special_offer_limit(
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the "members only"-status of a special offer.
@@ -118,7 +119,8 @@ pub async fn set_special_offer_members_only(
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the start time of a special offer.
@@ -150,7 +152,8 @@ pub async fn set_special_offer_start(
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the start time of a special offer to "now".
@@ -173,7 +176,8 @@ pub async fn set_special_offer_start_now(special_offer: Id<SpecialOffer>) -> Res
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the end time of a special offer.
@@ -206,7 +210,8 @@ pub async fn set_special_offer_end(
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Delete a special offer.
@@ -227,7 +232,8 @@ pub async fn delete_special_offer(special_offer: Id<SpecialOffer>) -> Result<()>
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }
 
 /// Set the deal of a special offer.
@@ -239,7 +245,7 @@ pub async fn delete_special_offer(special_offer: Id<SpecialOffer>) -> Result<()>
 /// - An error occurs during communication with the database.
 #[server]
 pub async fn set_special_offer_deal(special_offer: Id<SpecialOffer>, deal: Deal) -> Result<()> {
-    let (new_price, quantity1, quantity2) = deal.database_repr().ok_or_else(|| todo!())?;
+    let (new_price, quantity1, quantity2) = deal.database_repr()?;
 
     query!(
         "
@@ -254,5 +260,6 @@ pub async fn set_special_offer_deal(special_offer: Id<SpecialOffer>, deal: Deal)
     )
     .execute(&*POOL)
     .await?
-    .by_unique_key(|| todo!())
+    .by_unique_key()
+    .map_err(Into::into)
 }

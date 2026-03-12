@@ -18,6 +18,7 @@ use {
     dioxus_fullstack::response::IntoResponse as _,
     http::header::SET_COOKIE,
     sqlx::{query, query_as},
+    thiserror::Error,
 };
 
 #[cfg(feature = "server")]
@@ -123,6 +124,16 @@ pub async fn create_user(
     .map_err(Into::into)
 }
 
+#[cfg(feature = "server")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Error)]
+#[error("No user exists with the provided username.")]
+struct IncorrectPassword;
+
+#[cfg(feature = "server")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Error)]
+#[error("The provided password is incorrect.")]
+struct InvalidUsername;
+
 #[server]
 pub async fn log_in(username: Username, password: Box<str>) -> Result<Response> {
     struct User {
@@ -140,20 +151,18 @@ pub async fn log_in(username: Username, password: Box<str>) -> Result<Response> 
     )
     .fetch_optional(&*POOL)
     .await?
-    .ok_or_else(|| todo!())?;
+    .ok_or(InvalidUsername)?;
 
     verify_password(&password, &PasswordHash::new(&password_hash).unwrap())?
         .then(|| {
             (
-                [(
-                    SET_COOKIE,
-                    format!("user_id={}; Path=/; SameSite=Lax", id),
-                )],
+                [(SET_COOKIE, format!("user_id={}; Path=/; SameSite=Lax", id))],
                 "",
             )
                 .into_response()
         })
-        .ok_or_else(|| todo!())
+        .ok_or(IncorrectPassword)
+        .map_err(Into::into)
 }
 
 #[server]
@@ -204,7 +213,7 @@ pub async fn login_info(user: Id<User>) -> Result<Login> {
     .fetch_one(&*POOL)
     .await
     .map(|repr| Login::from_repr(user, repr))
-    .map_err(|_| todo!())
+    .map_err(Into::into)
 }
 
 /// Information about a login session.

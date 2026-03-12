@@ -81,6 +81,7 @@ enum Route {
 #[allow(non_snake_case)]
 #[component]
 fn App() -> Element {
+    #[cfg_attr(not(feature = "web"), expect(unused_mut, unused_variables))]
     let mut global_state = use_context_provider(|| Signal::new(GlobalState::default()));
 
     let _effect = use_effect(move || {
@@ -108,12 +109,16 @@ fn App() -> Element {
 
                                 let customer_id = global_state.read().customer_id();
                                 if let Some(customer_id) = customer_id {
-                                    if let Ok(favs) = crate::database::products::favorites(customer_id, 1000, 0).await {
-                                        global_state.write().favorites = favs.iter().map(|p| p.id.get()).collect();
+                                    if let Ok(favs) =
+                                        crate::database::products::favorites(customer_id, 1000, 0)
+                                            .await
+                                    {
+                                        global_state.write().favorites =
+                                            favs.iter().map(|p| p.id.get()).collect();
                                     }
                                 }
-                            }
-                            Err(_e) => {}
+                            },
+                            Err(_e) => {},
                         }
                     }
                 }

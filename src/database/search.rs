@@ -141,7 +141,7 @@ mod usage {
                                 }
                             }
                         }
-                        Some(Err(_)) => todo!(),
+                        Some(Err(_)) => rsx! { "An error occured." },
                         None => rsx! { "Loading..." },
                     }
                 }
