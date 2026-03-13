@@ -2,14 +2,14 @@ use crate::Route;
 use crate::database::{LoginId, log_out};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
-
-/// Dropdown shown when clicking the profile icon in the navbar.
+ 
+/// Dropdown shown when clicking the profile icon in the navbar
 #[component]
 pub fn AuthDropdown(on_close: EventHandler<()>) -> Element {
 let global_state = use_context::<Signal<GlobalState>>();
 let login = global_state.read().login.clone();
 let nav = use_navigator();
-
+ 
 rsx! {
     div { class: "fixed inset-0 z-40", onclick: move |_| on_close.call(()) }
     div { class: "absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden",
@@ -49,7 +49,7 @@ rsx! {
                         let nav = nav.clone();
                         let _task = spawn(async move {
                             drop(log_out().await);
-                            gs.write().login = None;
+                            gs.write().log_out();
                             on_close.call(());
                             let _unused = nav.push(Route::Home {});
                         });
@@ -64,7 +64,7 @@ rsx! {
                     "Kund"
                 }
                 Link {
-                    to: Route::Login {}, // TODO: Add Login route
+                    to: Route::Login {},
                     class: "flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-sm text-gray-700 transition",
                     onclick: move |_| on_close.call(()),
                     i { class: "fa-solid fa-right-to-bracket w-4" }
@@ -72,7 +72,7 @@ rsx! {
                 }
 
                 Link {
-                    to: Route::Register {}, // TODO: Add Register route
+                    to: Route::Register {},
                     class: "flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-green-50 text-sm text-green-700 transition font-semibold",
                     onclick: move |_| on_close.call(()),
                     i { class: "fa-solid fa-user-plus w-4" }
@@ -85,7 +85,7 @@ rsx! {
                 }
 
                 Link {
-                    to: Route::VendorLogin {}, // TODO: Add VendorLogin route
+                    to: Route::VendorLogin {},
                     class: "flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-sm text-gray-700 transition",
                     onclick: move |_| on_close.call(()),
                     i { class: "fa-solid fa-store w-4" }
@@ -93,7 +93,7 @@ rsx! {
                 }
 
                 Link {
-                    to: Route::VendorRegister {}, // TODO: Add VendorRegister route
+                    to: Route::VendorRegister {},
                     class: "flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-green-50 text-sm text-green-700 transition font-semibold",
                     onclick: move |_| on_close.call(()),
                     i { class: "fa-solid fa-building w-4" }

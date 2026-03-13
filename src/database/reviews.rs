@@ -306,9 +306,12 @@ pub async fn product_reviews(
 ) -> Result<Box<[ProductReview]>> {
     let mut review_ids = Vec::with_capacity(limit);
 
-    let mut tx = POOL
-        .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
-        .await?;
+    let mut tx = POOL.begin().await?;
+    drop(
+        sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            .execute(&mut *tx)
+            .await?,
+    );
 
     let reviews = query_as!(
         ReviewRepr,
@@ -473,9 +476,12 @@ pub async fn product_reviews_as(
     // Own review is excluded from the limit.
     let mut review_ids = Vec::with_capacity(limit + 1);
 
-    let mut tx = POOL
-        .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
-        .await?;
+    let mut tx = POOL.begin().await?;
+    drop(
+        sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            .execute(&mut *tx)
+            .await?,
+    );
 
     let own_review = query_as!(
         OwnReviewRepr,
@@ -647,7 +653,8 @@ pub async fn product_reviews_as(
                     comments: comment_trees.remove(&id).unwrap_or_default(),
                     sum_votes,
                     own_vote,
-                }
+                }             
+
             },
         )
         .collect::<Box<_>>();
@@ -928,7 +935,7 @@ pub struct CustomerReview {
     /// The content of the review.
     pub content: Box<str>,
 }
-
+ 
 #[cfg(feature = "server")]
 struct CustomerReviewRepr {
     product: RawId,
@@ -938,7 +945,7 @@ struct CustomerReviewRepr {
     content: String,
     product_name: String,
 }
-
+ 
 #[cfg(feature = "server")]
 impl From<CustomerReviewRepr> for CustomerReview {
     fn from(

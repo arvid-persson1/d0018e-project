@@ -1,16 +1,16 @@
 use crate::Route;
-use crate::components::product_card::ProductCard;
+use crate::components::product_card::{offer_label, ProductCard};
 use crate::database::products::favorites;
 use crate::state::GlobalState;
 use dioxus::prelude::*;
 use rust_decimal::prelude::ToPrimitive;
-
+ 
 /// Favorites page.
 #[component]
 pub fn FavoritesPage() -> Element {
-    let global_state = use_context::<Signal<GlobalState>>();
+    let mut global_state = use_context::<Signal<GlobalState>>();
     let login = global_state.read().login.clone();
-
+ 
     // Hämta customer ID från login
     let customer_id = match login.as_ref().and_then(|l| {
         if let crate::database::LoginId::Customer(id) = l.id {
@@ -45,9 +45,26 @@ pub fn FavoritesPage() -> Element {
             };
         }
     };
-
+ 
     let fav_resource = use_resource(move || async move { favorites(customer_id, 100, 0).await });
-
+ 
+    // Synka DB-favoriter med GlobalState så hjärtikonen alltid är rätt
+    #[allow(unused_results)]
+    use_effect(move || {
+        if let Some(Ok(products)) = fav_resource.read().as_ref() {
+            let ids: Vec<i32> = products.iter().map(|p| p.id.get()).collect();
+            let mut gs = global_state.write();
+            // Behåll de som redan finns lokalt men lägg till de från DB
+            for &id in &ids {
+                if !gs.favorites.contains(&id) {
+                    gs.favorites.push(id);
+                }
+            }
+            // Ta bort de som DB inte känner till
+            gs.favorites.retain(|id| ids.contains(id));
+        }
+    });
+ 
     rsx! {
         div { class: "container mx-auto p-8",
             Link {
@@ -80,6 +97,8 @@ pub fn FavoritesPage() -> Element {
                                 price: p.price.to_f64().unwrap_or_default(),
                                 comparison_price: format!("{:.2} kr", p.price),
                                 image_url: p.thumbnail.to_string(),
+                                in_stock: p.in_stock.into(),
+                                special_offer: offer_label(p.special_offer_deal, p.price),
                             }
                         }
                     }

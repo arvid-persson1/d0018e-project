@@ -1,6 +1,6 @@
 use crate::database::Login;
 //use dioxus::prelude::*;
-
+ 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CartItem {
     pub product_id: i32,
@@ -9,7 +9,7 @@ pub struct CartItem {
     pub image_url: String,
     pub quantity: u32,
 }
-
+ 
 /// Global state shared across the app.
 #[derive(Clone, Debug)]
 pub struct GlobalState {
@@ -18,13 +18,13 @@ pub struct GlobalState {
     pub login: Option<Login>,
     pub auth_loading: bool,
 }
-
+ 
 impl Default for GlobalState {
     fn default() -> Self {
         Self { cart: Vec::new(), favorites: Vec::new(), login: None, auth_loading: true }
     }
 }
-
+ 
 impl GlobalState {
     pub fn add_to_cart(&mut self, product_id: i32, name: String, price: f64, image_url: String) {
         if let Some(item) = self.cart.iter_mut().find(|i| i.product_id == product_id) {
@@ -39,7 +39,7 @@ impl GlobalState {
             });
         }
     }
-
+ 
     pub fn set_quantity(&mut self, product_id: i32, quantity: u32) {
         if quantity == 0 {
             self.cart.retain(|i| i.product_id != product_id);
@@ -47,18 +47,19 @@ impl GlobalState {
             item.quantity = quantity;
         }
     }
-
+ 
     pub fn remove_from_cart(&mut self, product_id: i32) {
         self.cart.retain(|i| i.product_id != product_id);
     }
-
+ 
     pub fn cart_total(&self) -> f64 {
         self.cart.iter().map(|i| i.price * i.quantity as f64).sum()
     }
-
+ 
     pub fn cart_count(&self) -> usize {
         self.cart.iter().map(|i| i.quantity as usize).sum()
     }
+ 
     pub fn customer_id(&self) -> Option<crate::database::Id<crate::database::Customer>> {
         self.login.as_ref().and_then(|l| {
             if let crate::database::LoginId::Customer(id) = l.id {
@@ -67,5 +68,12 @@ impl GlobalState {
                 None
             }
         })
+    }
+ 
+    /// Logga ut, rensar login, favoriter och kundvagn från minnet
+    pub fn log_out(&mut self) {
+        self.login = None;
+        self.favorites.clear();
+        self.cart.clear();
     }
 }

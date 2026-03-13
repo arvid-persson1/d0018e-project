@@ -1,5 +1,5 @@
 use crate::Route;
-use crate::components::product_card::ProductCard;
+use crate::components::product_card::{offer_label, ProductCard};
 use crate::database::products::{
     ProductOverview, ProductOverviewDiscounted, best_discounts, newest_products,
 };
@@ -13,16 +13,12 @@ pub fn Home() -> Element {
     let global_state = use_context::<Signal<GlobalState>>();
     let customer_id = global_state.read().login.as_ref().and_then(|l| {
         use crate::database::LoginId;
-        if let LoginId::Customer(id) = l.id {
-            Some(id)
-        } else {
-            None
-        }
+        if let LoginId::Customer(id) = l.id { Some(id) } else { None }
     });
-
+ 
     let discounted = use_resource(move || async move { best_discounts(customer_id, 12, 0).await });
     let newest = use_resource(move || async move { newest_products(customer_id, 12, 0).await });
-
+ 
     rsx! {
         div { class: "min-h-screen bg-gray-50",
             main { class: "container mx-auto p-4 py-8",
@@ -30,13 +26,10 @@ pub fn Home() -> Element {
                     h1 { class: "text-2xl font-bold text-gray-800", "Välkommen till boop!" }
                     p { class: "text-gray-600", "Vi är definitivt inte coop" }
                 }
-
-                // Bästa erbjudanden
                 div { class: "mb-20",
                     div { class: "flex justify-between items-center mb-6",
                         h2 { class: "text-xl font-bold flex items-center gap-2",
                             span { class: "w-2 h-8 bg-green-700 rounded-full block" }
-                            //i { class: "fa-solid fa-tag text-green-600 mr-1" }
                             "Bästa erbjudanden!"
                         }
                     }
@@ -62,13 +55,10 @@ pub fn Home() -> Element {
                         },
                     }
                 }
-
-                // Senast tillagda
                 div { class: "mb-20",
                     div { class: "flex justify-between items-center mb-6",
                         h2 { class: "text-xl font-bold flex items-center gap-2",
                             span { class: "w-2 h-8 bg-green-700 rounded-full block" }
-                            //i { class: "fa-solid fa-clock text-green-600 mr-1" }
                             "Senast tillagda"
                         }
                     }
@@ -98,26 +88,21 @@ pub fn Home() -> Element {
         }
     }
 }
-
+ 
 #[derive(Props, Clone, PartialEq)]
 struct DiscountedSliderProps {
     products: Vec<ProductOverviewDiscounted>,
 }
-
+ 
 #[component]
 fn DiscountedSlider(props: DiscountedSliderProps) -> Element {
     use rust_decimal::prelude::ToPrimitive;
     let mut pos = use_signal(|| 0_usize);
     let items = props.products;
     let total = items.len();
-    let max_steps = if total > 4 {
-        (total as f64 / 4.0).ceil() as usize
-    } else {
-        1
-    };
+    let max_steps = if total > 4 { (total as f64 / 4.0).ceil() as usize } else { 1 };
     let current_pos = *pos.read();
     let offset = current_pos * 100;
-
     rsx! {
         div { class: "relative group",
             if current_pos > 0 && total > 4 {
@@ -143,6 +128,8 @@ fn DiscountedSlider(props: DiscountedSliderProps) -> Element {
                                     .unwrap_or_else(|| p.price.to_f64().unwrap_or_default()),
                                 comparison_price: format!("{:.2} kr / {}", p.price, p.amount_per_unit),
                                 image_url: p.thumbnail.to_string(),
+                                in_stock: p.in_stock.into(),
+                                special_offer: offer_label(Some(p.special_offer_deal), p.price),
                             }
                         }
                     }
@@ -178,26 +165,21 @@ fn DiscountedSlider(props: DiscountedSliderProps) -> Element {
         }
     }
 }
-
+ 
 #[derive(Props, Clone, PartialEq)]
 struct NewestSliderProps {
     products: Vec<ProductOverview>,
 }
-
+ 
 #[component]
 fn NewestSlider(props: NewestSliderProps) -> Element {
     use rust_decimal::prelude::ToPrimitive;
     let mut pos = use_signal(|| 0_usize);
     let items = props.products;
     let total = items.len();
-    let max_steps = if total > 4 {
-        (total as f64 / 4.0).ceil() as usize
-    } else {
-        1
-    };
+    let max_steps = if total > 4 { (total as f64 / 4.0).ceil() as usize } else { 1 };
     let current_pos = *pos.read();
     let offset = current_pos * 100;
-
     rsx! {
         div { class: "relative group",
             if current_pos > 0 && total > 4 {
@@ -219,6 +201,8 @@ fn NewestSlider(props: NewestSliderProps) -> Element {
                                 price: p.price.to_f64().unwrap_or_default(),
                                 comparison_price: format!("{:.2} kr / {}", p.price, p.amount_per_unit),
                                 image_url: p.thumbnail.to_string(),
+                                in_stock: p.in_stock.into(),
+                                special_offer: offer_label(p.special_offer_deal, p.price),
                             }
                         }
                     }
