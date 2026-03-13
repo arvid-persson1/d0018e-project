@@ -78,10 +78,6 @@ pub async fn create_user(
         .unwrap()
         .serialize();
 
-    // #[derive(Type)]
-    // struct PhcString<'a>(&'a str);
-    // let password_hash = PhcString(password_hash.as_str());
-
     // HACK: `password_hash` Must be `PHC_STRING` for the call to resolve to the correct procedure,
     // but must be `TEXT` to coerce to the domain type.
     match data {

@@ -3,6 +3,8 @@
 -- database. Rather this is meant as a form of documentation of the database schema manually kept
 -- up-to-date.
 
+-- FIXME: Impose consistent row-lock order.
+
 CREATE EXTENSION citext;
 CREATE EXTENSION btree_gist;
 CREATE EXTENSION pg_cron;
@@ -49,8 +51,6 @@ CREATE TABLE users (
 
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- This column can't be automatically generated as it has to be written to by triggers when
-    -- role row is updated.
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -70,7 +70,6 @@ CREATE TRIGGER users_creation_time
 BEFORE INSERT OR UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
--- PERF: Currently (unnecessarily) runs when role row is updated.
 CREATE FUNCTION update_time() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -80,14 +79,14 @@ END;
 $$;
 
 CREATE TRIGGER users_update_time
-BEFORE UPDATE ON users
+BEFORE UPDATE OF username, email, password_hash ON users
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE TABLE customers (
     id INT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     profile_picture URL,
-    -- Null: not a member.
     member_since NONFUTURE_TIMESTAMP DEFAULT NULL,
+    member BOOLEAN GENERATED ALWAYS AS (member_since IS NOT NULL),
     can_review BOOLEAN NOT NULL DEFAULT TRUE
 );
 
@@ -136,11 +135,11 @@ END;
 $$;
 
 CREATE TRIGGER customers_update_time_super
-BEFORE UPDATE ON customers
+BEFORE UPDATE OF id, profile_picture, member_since ON customers
 FOR EACH ROW EXECUTE FUNCTION update_time_user_super();
 
 CREATE TRIGGER vendors_update_time_super
-BEFORE UPDATE ON vendors
+BEFORE UPDATE OF , profile_picture, display_name, description ON vendors
 FOR EACH ROW EXECUTE FUNCTION update_time_user_super();
 
 CREATE TRIGGER administrators_update_time_super
@@ -187,6 +186,8 @@ CREATE CONSTRAINT TRIGGER administrators_valid_superclass
 AFTER INSERT OR UPDATE OF id OR DELETE ON administrators
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION validate_user_role();
+
+-- TODO: Handle reactivation of deleted users.
 
 CREATE PROCEDURE create_customer(
     username users.username%TYPE,
@@ -254,15 +255,6 @@ DECLARE
     current_name categories.name%TYPE;
     current_parent categories.parent%TYPE;
 BEGIN
-    -- Locking the entire table is acceptable; creating categories is an infrequent, manual action.
-    PERFORM 1
-    FROM categories
-    ORDER BY id
-    FOR SHARE;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Category % does not exist.', start_id;
-    END IF;
-
     LOOP
         SELECT id, name, parent
         INTO STRICT current_id, current_name, current_parent
@@ -293,7 +285,7 @@ END;
 $$;
 
 CREATE TRIGGER categories_valid_tree
-AFTER INSERT OR UPDATE OF parent ON categories
+BEFORE INSERT OR UPDATE OF parent ON categories
 FOR EACH ROW EXECUTE FUNCTION categories_validate_tree();
 
 CREATE TABLE products (
@@ -310,6 +302,7 @@ CREATE TABLE products (
     category INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     origin TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- NOTE: Does not track changes to stock or visibility.
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     search_vector TSVECTOR NOT NULL,
     amount_per_unit TWOPOINT_UDEC NOT NULL DEFAULT 1,
@@ -328,7 +321,9 @@ BEFORE INSERT OR UPDATE ON products
 FOR EACH ROW EXECUTE FUNCTION creation_time();
 
 CREATE TRIGGER products_update_time
-BEFORE UPDATE ON products
+BEFORE UPDATE OF name, thumbnail, gallery, price, overview, description,
+                 vendor, category, origin, amount_per_unit, measurement_unit
+ON products
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
 CREATE FUNCTION products_search_vector(product products.id%TYPE) RETURNS TSVECTOR
@@ -374,6 +369,7 @@ CREATE INDEX products_by_search_vector ON products USING GIN(search_vector);
 CREATE TABLE special_offers (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     members_only BOOLEAN NOT NULL DEFAULT FALSE,
     -- Measured in number of batches (per unit if there is no concept of a batch).
     limit_per_customer POSITIVE_INT,
@@ -405,7 +401,11 @@ SELECT *
 FROM special_offers
 WHERE valid_from < CURRENT_TIMESTAMP AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
 
-CREATE OR REPLACE FUNCTION average_discount(
+CREATE TRIGGER offers_update_time
+BEFORE UPDATE ON special_offers
+FOR EACH ROW EXECUTE FUNCTION update_time();
+
+CREATE FUNCTION average_discount(
     base_price products.price%TYPE,
     new_price special_offers.new_price%TYPE,
     quantity1 special_offers.quantity1%TYPE,
@@ -525,20 +525,7 @@ CREATE FUNCTION process_expiries() RETURNS TABLE (
     -- does *not* represent the number of products that actually expired.
     total BIGINT
 ) LANGUAGE sql AS $$
-    WITH products_lock AS (
-        SELECT p.id
-        FROM products p
-        JOIN pending_expiries ON pending_expiries.product = p.id
-        ORDER BY p.id
-        FOR NO KEY UPDATE OF products
-    ),
-    expiries_lock AS (
-        SELECT 1
-        FROM pending_expiries
-        ORDER BY product, expiry
-        FOR NO KEY UPDATE
-    ),
-    processed AS (
+    WITH processed AS (
         UPDATE pending_expiries
         SET processed_at = CURRENT_TIMESTAMP
         RETURNING product, number
@@ -594,7 +581,7 @@ BEGIN
         INSERT INTO expiries (product, expiry, number)
         VALUES (product_id, expiry, number)
         ON CONFLICT (product, expiry) DO UPDATE
-        SET number = expiries.number + EXCLUDED.number;
+        SET number = OLD.number + EXCLUDED.number;
     END IF;
     
     UPDATE products
@@ -828,7 +815,7 @@ CREATE TABLE shopping_cart_items (
     -- Null: product was deleted since being added to cart. The customer can see that this has
     -- happened, but not what the product was.
     product INT REFERENCES products(id) ON DELETE SET NULL,
-    number POSITIVE_INT NOT NULL,
+    number UINT NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -842,20 +829,22 @@ CREATE TRIGGER cart_update_time
 BEFORE UPDATE ON shopping_cart_items
 FOR EACH ROW EXECUTE FUNCTION update_time();
 
-CREATE PROCEDURE set_visibility(product_id products.id%TYPE, visible products.visible%TYPE)
+CREATE FUNCTION hide_from_carts_on_invisible() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF NOT visible THEN
+    IF NOT NEW.visibile THEN
         UPDATE shopping_cart_items
         SET product = NULL
         WHERE product = product_id;
     END IF;
 
-    UPDATE products
-    SET visible = visible
-    WHERE id = product_id;
+    RETURN NEW;
 END;
 $$;
+
+CREATE TRIGGER products_hide_invisible_from_carts
+AFTER UPDATE OF visible ON products
+FOR EACH ROW EXECUTE FUNCTION hide_from_carts_on_invisible();
 
 CREATE FUNCTION calculate_price(
     base_price products.price%TYPE,
@@ -965,34 +954,46 @@ CREATE TABLE orders (
     -- proper audit logging is important, the product table needs a redesign.
     product INT REFERENCES products(id) ON DELETE SET NULL,
     time NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     -- A more strict history could be maintained. For example, it might be desirable to store a
     -- copy of the deal from the special offers used (or at least the discount), and basic
     -- information in the case that the product is deleted.
-
     number POSITIVE_INT NOT NULL,
-    paid TWOPOINT_UDEC NOT NULL,
-    special_offer_used BOOLEAN NOT NULL,
-    -- At the time of purchase.
-    amount_per_unit TWOPOINT_UDEC NOT NULL DEFAULT 1,
-    -- Null: discrete amount.
-    measurement_unit TEXT,
-    CONSTRAINT valid_without_unit CHECK (measurement_unit IS NOT NULL OR amount_per_unit % 1 = 0)
+    paid TWOPOINT_UDEC NOT NULL
 );
 
 CREATE INDEX orders_per_customer_by_time ON orders (customer, time DESC);
 CREATE INDEX orders_by_customer_product ON orders (customer, product);
 
--- TODO: Cart must be frozen or copied when the customer is viewing it to prevent cart items from
--- updating due to concurrent access. It must also be verified that the special offers used in
--- price calculation and the product base prices are the same ones they see in the cart so they way
--- the expected price.
-
-CREATE PROCEDURE checkout(customer_id customers.id%TYPE)
+CREATE TYPE CHECKOUT_ITEM AS (
+    product INT,
+    number POSITIVE_INT,
+    special_offer INT,
+    expected_price TWOPOINT_UDEC
+);
+CREATE PROCEDURE checkout(
+    customer_id customers.id%TYPE,
+    -- These are NOT necessarily connected to the contents of the customer's rows in,
+    -- `shopping_cart_items`, though the numbers of those rows are decremented on success.
+    items CHECKOUT_ITEM[],
+    seen_at NONFUTURE_TIMESTAMP
+)
 LANGUAGE plpgsql AS $$
-DECLARE
-    found_offers INT;
 BEGIN
+    IF seen_at IS NULL THEN
+        RAISE EXCEPTION 'Must include time cart was seen.';
+    END IF;
+
+    CREATE TEMP TABLE cart (
+        product INT PRIMARY KEY,
+        number POSITIVE_INT NOT NULL,
+        special_offer INT,
+        expected_price TWOPOINT_UDEC NOT NULL
+    ) ON COMMIT DROP;
+    INSERT INTO cart
+    SELECT *
+    FROM UNNEST(items);
+
+    -- We allow concurrent updates to membership status as it is only read once.
     PERFORM 1
     FROM customers
     WHERE id = customer_id
@@ -1001,103 +1002,107 @@ BEGIN
         RAISE EXCEPTION 'Customer % does not exist.', customer_id;
     END IF;
 
-    CREATE TEMP TABLE items
-    ON COMMIT DROP AS
-    WITH to_delete AS (
-        SELECT 1
-        FROM shopping_cart_items
-        WHERE customer = customer_id
-        ORDER BY product
-        FOR UPDATE
-    ),
-    deleted AS (
-        DELETE FROM shopping_cart_items
-        WHERE customer = customer_id
-        RETURNING product, number
-    )
-    SELECT *
-    FROM deleted;
-    IF NOT FOUND THEN
-        RAISE NOTICE 'Checkout with no items.';
+    IF (SELECT COUNT(*) FROM cart) = 0 THEN
+        RAISE INFO 'Checkout with no items for customer %.', customer_id;
         RETURN;
+    ELSIF EXISTS (
+        SELECT 1
+        FROM cart
+        JOIN products ON id = product
+        WHERE NOT visible
+    ) THEN
+        RAISE EXCEPTION 'Cart of customer % contains invisible products.', customer_id;
     END IF;
 
-    PERFORM p.id
+    PERFORM 1
     FROM products p
-    JOIN items ON items.product = p.id
-    ORDER BY p.id
-    FOR SHARE;
+    JOIN cart ON id = product
+    FOR SHARE OF p;
 
-    -- TODO: Report product ID.
+    PERFORM 1
+    FROM special_offers s
+    JOIN cart ON id = special_offer
+    FOR KEY SHARE OF s;
+    
     IF EXISTS (
         SELECT 1
-        FROM items
-        LEFT JOIN products p ON p.id = items.product
-        WHERE p.id IS NULL OR NOT p.visible
+        FROM cart
+        JOIN products ON id = product
+        WHERE updated_at > seen_at
     ) THEN
-        RAISE EXCEPTION 'Checkout with missing or invisible product.';
+        RAISE EXCEPTION 'Stale data: Product has changed.';
+    ELSIF EXISTS (
+        SELECT 1
+        FROM cart
+        LEFT JOIN active_special_offers aso ON aso.id = special_offer
+        WHERE special_offer IS NOT NULL AND aso.updated_at IS NULL OR aso.updated_at > seen_at
+    ) THEN
+        RAISE EXCEPTION 'Stale data: Special offer has expired.';
+    ELSIF EXISTS (
+        SELECT 1
+        FROM cart
+        JOIN active_special_offers aso ON aso.id = special_offer
+        JOIN customers c ON c.id = customer_id
+        WHERE members_only AND NOT member OR aso.updated_at > seen_at
+    ) THEN
+        RAISE EXCEPTION 'Stale data: Customer (%) is not eligible.', customer_id;
     END IF;
 
-    CREATE TEMP TABLE applied
-    ON COMMIT DROP AS
-    -- Filter offers first to avoid creating unnecessary rows, see below.
-    WITH eligible_offers AS (
-        SELECT s.id, s.product, s.new_price, s.quantity1, s.quantity2, s.limit_per_customer
-        FROM special_offers s
-        JOIN customers ON customers.id = customer_id
-        JOIN items ON items.product = s.product
-        WHERE valid_from <= CURRENT_TIMESTAMP
-            AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
-            AND (NOT members_only OR member_since IS NOT NULL)
-        ORDER BY s.id
-        FOR KEY SHARE OF s
-    )
-    SELECT id, product, new_price, quantity1, quantity2,
-        CASE
-            WHEN limit_per_customer IS NULL THEN NULL
-            ELSE GREATEST(limit_per_customer - COALESCE(sou.previous_uses, 0), 0)
-        END AS remaining_uses
-    FROM eligible_offers
-    LEFT JOIN LATERAL (
-        -- `special_offer_uses` must have a row to lock to prevent another call from
-        -- double-counting.
-        WITH insert_zeros AS (
-            INSERT INTO special_offer_uses (special_offer, customer, number)
-            VALUES (id, customer_id, 0)
-            ON CONFLICT (special_offer, customer) DO NOTHING
-        )
-        SELECT number
-        FROM special_offer_uses
-        WHERE special_offer = eligible_offers.id AND customer = customer_id
-        FOR NO KEY UPDATE
-    ) sou ON TRUE;
-
-    -- Fails on negative stock.
-    UPDATE products
-    SET in_stock = in_stock - number
-    FROM items
-    WHERE id = product;
-
-    PERFORM sale_remove_expiries(product, number)
-    FROM items;
+    -- Insert zeros to prevent other calls from double-counting, and do dummy update on existing
+    -- rows to lock them.
+    INSERT INTO special_offer_uses (special_offer, customer, number)
+    SELECT special_offer, customer_id, 0
+    FROM cart
+    WHERE special_offer IS NOT NULL
+    ON CONFLICT (special_offer, customer) DO UPDATE
+    SET number = special_offer_uses.number;
 
     CREATE TEMP TABLE results
     ON COMMIT DROP AS
-    SELECT i.product, i.number, p.amount_per_unit, p.measurement_unit, c.price, c.uses, a.id AS special_offer_id
-    FROM items i
-    JOIN products p ON p.id = i.product
-    LEFT JOIN applied a ON a.product = i.product
-    CROSS JOIN LATERAL calculate_price(p.price, i.number, a.new_price, a.quantity1, a.quantity2, a.remaining_uses) AS c;
+    SELECT cart.*, calc.price, calc.uses
+    FROM cart
+    JOIN products p ON p.id = product
+    LEFT JOIN active_special_offers aso ON aso.id = special_offer
+    LEFT JOIN special_offer_uses sou ON sou.special_offer = cart.special_offer AND customer = customer_id
+    CROSS JOIN LATERAL calculate_price(
+        price, cart.number, new_price, quantity1, quantity2,
+        CASE
+            WHEN limit_per_customer IS NULL THEN NULL
+            ELSE GREATEST(limit_per_customer - COALESCE(sou.number, 0), 0)
+        END
+    ) AS calc;
 
-    INSERT INTO special_offer_uses (special_offer, customer, number)
-    SELECT special_offer_id, customer_id, uses
-    FROM results
-    WHERE special_offer_id IS NOT NULL AND uses > 0
-    ON CONFLICT (special_offer, customer) DO UPDATE
-    SET number = number + EXCLUDED.number;
+    IF EXISTS (
+        SELECT 1
+        FROM results
+        WHERE price != expected_price
+    ) THEN
+        RAISE EXCEPTION 'Stale data: Special offer has been used enough times to create a price discrepancy.';
+    END IF;
 
-    INSERT INTO orders (customer, product, number, paid, special_offer_used, amount_per_unit, measurement_unit)
-    SELECT customer_id, product, number, price, uses > 0, amount_per_unit, measurement_unit
+    -- Fails if product runs out of stock.
+    UPDATE products
+    SET in_stock = in_stock - number
+    FROM cart
+    WHERE id = product;
+
+    PERFORM sale_remove_expiries(product, number)
+    FROM cart;
+
+    UPDATE shopping_cart_items
+    SET number = GREATEST(shopping_cart_items.number - r.number, 0)
+    FROM results r
+    WHERE shopping_cart_items.product = r.product AND customer = customer_id;
+    DELETE FROM shopping_cart_items
+    WHERE customer = customer_id AND number = 0;
+
+    UPDATE special_offer_uses
+    SET number = special_offer_uses.number + r.number
+    FROM results r
+    WHERE r.special_offer = special_offer_uses.special_offer AND customer = customer_id AND uses > 0;
+
+    INSERT INTO orders (customer, product, number, paid)
+    SELECT customer_id, product, number, price
     FROM results;
 END;
 $$;

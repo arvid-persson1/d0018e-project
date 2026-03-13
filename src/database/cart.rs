@@ -1,16 +1,17 @@
 //! Database functions for interacting with a customer's shopping cart.
 
-use crate::database::{Customer, Deal, Id, Product, Url};
+use crate::database::{Customer, Deal, Id, Product, SpecialOffer, Url};
 use dioxus::prelude::*;
 use hashbrown::HashMap;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
+use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
     crate::database::{POOL, QueryResultExt},
-    sqlx::{query, query_as},
-    std::num::NonZero,
+    sqlx::{Type, query, query_as, query_scalar},
+    std::num::{NonZero, TryFromIntError},
 };
 
 // TODO: Function to get items in cart for display on cart page, include prices with discounts,
@@ -153,6 +154,12 @@ pub struct CartProduct {
     pub count: NonZeroU32,
     /// The currently active special offer on the product, if any and if the user is eligible.
     pub special_offer_deal: Option<Deal>,
+    /// How many more times the customer can benefit from the special offer, if there's a limit.
+    /// Value is unspecified if `special_offer_deal` is `None`.
+    pub special_offer_remaining_uses: Option<u32>,
+    /// Whether the special offer only applies to members. Value is unspecified if
+    /// `special_offer_deal` is `None`.
+    pub special_offer_members_only: bool,
     /// Whether the customer has marked the product as a favorite. Value is unspecified if a
     /// customer ID was not provided.
     pub favorited: bool,
@@ -169,6 +176,8 @@ struct CartProductRepr {
     new_price: Option<Decimal>,
     quantity1: Option<i32>,
     quantity2: Option<i32>,
+    members_only: bool,
+    remaining_uses: Option<i32>,
     favorited: bool,
 }
 
@@ -185,6 +194,8 @@ impl From<CartProductRepr> for CartProduct {
             new_price,
             quantity1,
             quantity2,
+            members_only,
+            remaining_uses,
             favorited,
         }: CartProductRepr,
     ) -> Self {
@@ -202,18 +213,36 @@ impl From<CartProductRepr> for CartProduct {
                 .expect("Database returned non-positive cart item count."),
             special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
                 .expect("Database returned invalid special offer."),
+            special_offer_remaining_uses: remaining_uses.map(|uses| {
+                uses.try_into()
+                    .expect("Database returned negative remaining uses.")
+            }),
+            special_offer_members_only: members_only,
             favorited,
         }
     }
 }
 
+/// Get the contents of a customer's cart, as well as the time when that data was known to be
+/// valid.
+///
+/// The timestamp returned from this function is the one that should be passed to [`checkout`].
 #[server]
-pub async fn cart_products(customer: Id<Customer>) -> Result<Box<[CartProduct]>> {
-    query_as!(
+pub async fn cart_products(
+    customer: Id<Customer>,
+) -> Result<(Box<[CartProduct]>, PrimitiveDateTime)> {
+    let mut tx = POOL.begin().await?;
+
+    let time = query_scalar!(r#"SELECT CURRENT_TIMESTAMP::TIMESTAMP AS "time!""#)
+        .fetch_one(&mut *tx)
+        .await?;
+
+    let products = query_as!(
         CartProductRepr,
         r#"
-        SELECT p.id, name, thumbnail, price, in_stock, number AS count,
-            new_price, quantity1, quantity2,
+        SELECT p.id, name, thumbnail, price, in_stock, s.number AS count,
+            new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
+            limit_per_customer - COALESCE(sou.number, 0) AS remaining_uses,
             EXISTS (
                 SELECT 1
                 FROM customer_favorites cf
@@ -222,38 +251,110 @@ pub async fn cart_products(customer: Id<Customer>) -> Result<Box<[CartProduct]>>
         FROM shopping_cart_items s
         JOIN products p ON p.id = s.product
         JOIN customers ON customers.id = $1
-        LEFT JOIN active_special_offers ON active_special_offers.product = s.product
+        LEFT JOIN active_special_offers aso ON aso.product = s.product
             AND (NOT members_only OR member_since IS NOT NULL)
-        WHERE customer = $1
+        LEFT JOIN special_offer_uses sou ON special_offer = aso.id AND sou.customer = $1
+        WHERE s.customer = $1 AND s.number > 0
         "#,
         customer.get()
     )
-    .fetch_all(&*POOL)
-    .await
-    .map(|products| products.into_iter().map(Into::into).collect())
-    .map_err(Into::into)
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .map(Into::into)
+    .collect();
+
+    tx.commit().await?;
+
+    Ok((products, time))
 }
 
-/// Complete an order for a customer, emptying their shopping cart.
+/// An item a customer wants to check out with.
 ///
-/// Calls may also include the IDs of all special offer expected to be applied. This avoids the
-/// case where the customer sees one price based on a special offer active at the time, but the
-/// database calculates a different price because the previously mentioned offer has lapsed. If no
-/// such list is provided, price will be based on whatever special offers are active at the time.
+/// This is to ensure the customer proceeds with what they see in the cart, which might be
+/// different from what the database knows about due to concurrent accesses, expired offers or
+/// other forms of stale data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckoutItem {
+    /// The ID of the product.
+    product: Id<Product>,
+    /// The number of units.
+    number: NonZeroU32,
+    /// The special offer the customer expects to be applied, if any.
+    special_offer: Option<Id<SpecialOffer>>,
+    /// The price the customer expects to pay.
+    expected_price: Decimal,
+}
+
+#[cfg(feature = "server")]
+#[derive(Type)]
+#[sqlx(type_name = "CHECKOUT_ITEM")]
+struct CheckoutItemRepr {
+    product: i32,
+    number: i32,
+    special_offer: Option<i32>,
+    expected_price: Decimal,
+}
+
+#[cfg(feature = "server")]
+impl TryFrom<CheckoutItem> for CheckoutItemRepr {
+    type Error = TryFromIntError;
+
+    fn try_from(
+        CheckoutItem {
+            product,
+            number,
+            special_offer,
+            expected_price,
+        }: CheckoutItem,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            product: product.get(),
+            number: number.get().try_into()?,
+            special_offer: special_offer.map(Id::get),
+            expected_price,
+        })
+    }
+}
+
+/// Complete an order for a customer.
+///
+/// Requires specifying the exact contents of the cart as the customer sees it, as well as the time
+/// that data was loaded. This is to deny checkout frm proceeding with stale data. The time should
+/// be the one returned from [`cart_products`].
 ///
 /// # Errors
 ///
 /// Fails if:
 /// - `customer` is invalid.
-/// - Any offer in `expected_offers` has lapsed.
-/// - The customer has any deleted or invisible products in their cart.
-/// - The customer has more units in their cart than there are in stock.
+/// - Any data in `items` is stale, including:
+///   - A product having changed (e.g. new name or price).
+///   - A product no longer having enough stock.
+///   - A product no longer being visible.
+///   - A special offer having expired.
+///   - The customer no longer being eligible for a special offer due to a membership change.
+///   - The customer not being able to apply a special offer enough times to achieve the expected
+///     price due to e.g. a concurrent checkout with the same account.
+/// - `seen_at` is in the future.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn checkout(customer: Id<Customer>) -> Result<()> {
-    query!("CALL checkout($1)", customer.get())
-        .execute(&*POOL)
-        .await
-        .map(QueryResultExt::procedure)
-        .map_err(Into::into)
+pub async fn checkout(
+    customer: Id<Customer>,
+    items: Vec<CheckoutItem>,
+    seen_at: PrimitiveDateTime,
+) -> Result<()> {
+    let items = items
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Box<_>, _>>()?;
+    query!(
+        "CALL checkout($1, $2, ($3::TIMESTAMP)::NONFUTURE_TIMESTAMP)",
+        customer.get(),
+        &items as &[CheckoutItemRepr],
+        seen_at,
+    )
+    .execute(&*POOL)
+    .await
+    .map(QueryResultExt::procedure)
+    .map_err(Into::into)
 }

@@ -383,12 +383,19 @@ pub async fn add_stock(
 /// - An error occurs during communication with the database.
 #[server]
 pub async fn set_visibility(product: Id<Product>, visible: bool) -> Result<()> {
-    // PERF: First subquery not currently supported by an index.
-    query!("CALL set_visibility($1, $2)", product.get(), visible)
-        .execute(&*POOL)
-        .await
-        .map(QueryResultExt::procedure)
-        .map_err(Into::into)
+    query!(
+        "
+        UPDATE products
+        SET visible = $2
+        WHERE id = $1
+        ",
+        product.get(),
+        visible,
+    )
+    .execute(&*POOL)
+    .await
+    .map(QueryResultExt::procedure)
+    .map_err(Into::into)
 }
 
 /// Set the "favorite" status of a product for a customer.

@@ -203,7 +203,7 @@ pub async fn product_info(
         r#"
         SELECT name, thumbnail, price, p.description, in_stock, origin,
             gallery AS "gallery: Vec<Url>", amount_per_unit, measurement_unit, visible,
-            created_at, updated_at, new_price, quantity1, quantity2,
+            created_at, p.updated_at, new_price, quantity1, quantity2,
             COALESCE(members_only, FALSE) AS "members_only!", limit_per_customer,
             vendors.id AS vendor_id, vendors.display_name AS vendor_name,
             category_path(category) AS "category_path!: Vec<CategoryPathSegment>",
@@ -257,31 +257,28 @@ pub struct Order {
 pub struct Purchase {
     /// How much was paid.
     pub paid: Decimal,
-    /// Whether a special offer affected the price.
-    pub special_offer_used: bool,
     /// How many units were purchased.
     pub number: NonZeroU32,
-    /// How much of the product was included in one unit at the time of purchase.
-    pub amount_per_unit: Amount,
     /// The name of the product.
     pub product_name: Box<str>,
     /// URL to an image of the product.
     pub thumbnail: Url,
     /// The name of the vendor.
     pub vendor_name: Box<str>,
+    /// Whether the product has changed since the order was made. This should be marked by an
+    /// indicator.
+    pub product_changed: bool,
 }
 
 #[cfg(feature = "server")]
 struct PurchaseRepr {
     time: PrimitiveDateTime,
     paid: Decimal,
-    special_offer_used: bool,
     number: i32,
-    amount_per_unit: Decimal,
-    measurement_unit: Option<String>,
     product_name: String,
     thumbnail: String,
     vendor_name: String,
+    product_changed: bool,
 }
 
 #[cfg(feature = "server")]
@@ -290,26 +287,23 @@ impl From<PurchaseRepr> for Purchase {
         PurchaseRepr {
             time: _,
             paid,
-            special_offer_used,
             number,
-            amount_per_unit,
-            measurement_unit,
             product_name,
             thumbnail,
             vendor_name,
+            product_changed,
         }: PurchaseRepr,
     ) -> Self {
         Self {
             paid,
-            special_offer_used,
             number: u32::try_from(number)
                 .ok()
                 .and_then(NonZeroU32::new)
                 .expect("Database returned non-positive number in order."),
-            amount_per_unit: Amount::from_repr(amount_per_unit, measurement_unit),
             product_name: product_name.into(),
             thumbnail: thumbnail.into(),
             vendor_name: vendor_name.into(),
+            product_changed,
         }
     }
 }
@@ -327,10 +321,9 @@ impl From<PurchaseRepr> for Purchase {
 pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Result<Box<[Order]>> {
     let orders = query_as!(
         PurchaseRepr,
-        "
-        SELECT time, paid, special_offer_used, number, o.amount_per_unit, o.measurement_unit,
-            p.name AS product_name, p.thumbnail,
-            display_name AS vendor_name
+        r#"
+        SELECT time, paid, number, p.name AS product_name, p.thumbnail,
+            display_name AS vendor_name, time > updated_at AS "product_changed!"
         FROM orders o
         JOIN products p ON p.id = o.product
         JOIN vendors ON vendors.id = p.vendor
@@ -338,7 +331,7 @@ pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Resu
         ORDER BY time DESC
         LIMIT $2
         OFFSET $3
-        ",
+        "#,
         customer.get(),
         i64::try_from(limit)?,
         i64::try_from(offset)?,
