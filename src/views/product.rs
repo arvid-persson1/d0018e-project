@@ -891,7 +891,7 @@ pub fn Product(id: i32) -> Element {
                     div { class: "text-red-600 font-black text-5xl mb-1", "{formatted_price} kr" }
                     div { class: "flex items-center gap-2 mt-2 mb-2",
                         span { class: "bg-gray-100 text-gray-700 text-sm font-semibold px-3 py-1 rounded-full",
-                            "📦 {amount_str} / förpackning"
+                            "{amount_str} / förpackning"
                         }
                     }
                     if let Some(label) = offer_label {
@@ -962,7 +962,7 @@ pub fn Product(id: i32) -> Element {
                             }
                         }
                     }
-                    // Favorit-knapp med DB-synk
+                    // Favorit-knapp
                     button {
                         class: "h-full px-6 border-2 border-gray-200 rounded-full transition-all {heart_class}",
                         onclick: move |_| {
