@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use crate::Route;
 use crate::database::{
-    products::{favorites, orders},
+    products::{customer_orders, favorites},
     reviews::customer_reviews,
 };
 use crate::state::GlobalState;
@@ -35,14 +35,19 @@ pub fn CustomerProfile() -> Element {
                     }
                 }
             };
-        }
+        },
     };
 
-    let username = login.as_ref().map(|l| l.username.to_string()).unwrap_or_default();
+    let username = login
+        .as_ref()
+        .map(|l| l.username.to_string())
+        .unwrap_or_default();
 
     let fav_resource = use_resource(move || async move { favorites(customer_id, 20, 0).await });
-    let orders_resource = use_resource(move || async move { orders(customer_id, 20, 0).await });
-    let reviews_resource = use_resource(move || async move { customer_reviews(customer_id, 20, 0).await });
+    let orders_resource =
+        use_resource(move || async move { customer_orders(customer_id, 20, 0).await });
+    let reviews_resource =
+        use_resource(move || async move { customer_reviews(customer_id, 20, 0).await });
 
     let mut active_tab = use_signal(|| 0_u8);
 
@@ -207,3 +212,4 @@ pub fn CustomerProfile() -> Element {
         }
     }
 }
+

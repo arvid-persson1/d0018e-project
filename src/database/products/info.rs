@@ -13,7 +13,7 @@ use time::PrimitiveDateTime;
 use {
     crate::database::{POOL, QueryResultExt as _, RawId},
     sqlx::{Type, query, query_as},
-    std::cmp::Reverse,
+    std::{cmp::Reverse, num::NonZero},
 };
 
 /// Information about a product, for display on product pages.
@@ -240,7 +240,7 @@ pub async fn product_info(
     .map_err(Into::into)
 }
 
-/// A completed order.
+/// A customer's order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrderInfo {
     /// The time of purchase.
@@ -339,7 +339,7 @@ pub enum OrderStatus {
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn orders(
+pub async fn customer_orders(
     customer: Id<Customer>,
     limit: usize,
     offset: usize,
@@ -384,6 +384,97 @@ pub async fn orders(
         "Orders not sorted."
     );
     Ok(orders.into())
+}
+
+/// A vendor's view of an order of one of their products.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrderVendorView {
+    /// The time of purchase.
+    pub time: PrimitiveDateTime,
+    /// The product purchased.
+    pub product: Id<Product>,
+    /// The name of the product.
+    pub product_name: Box<str>,
+    /// How many units were purchased.
+    pub number: NonZeroU32,
+    /// Whether the product has changed since the order was made. This should be marked by an
+    /// indicator.
+    pub product_changed: bool,
+    /// The status of the purchase.
+    pub status: OrderStatus,
+}
+
+#[cfg(feature = "server")]
+struct OrderVendorViewRepr {
+    time: PrimitiveDateTime,
+    product: i32,
+    product_name: String,
+    number: i32,
+    product_changed: bool,
+    status: OrderStatus,
+}
+
+#[cfg(feature = "server")]
+impl From<OrderVendorViewRepr> for OrderVendorView {
+    fn from(
+        OrderVendorViewRepr {
+            time,
+            product,
+            product_name,
+            number,
+            product_changed,
+            status,
+        }: OrderVendorViewRepr,
+    ) -> Self {
+        Self {
+            time,
+            product: product.into(),
+            product_name: product_name.into(),
+            number: u32::try_from(number)
+                .ok()
+                .and_then(NonZero::new)
+                .expect("Database returned non-positive number in order."),
+            product_changed,
+            status,
+        }
+    }
+}
+
+/// Get orders for a vendor's products sorted by recency.
+///
+/// # Errors
+///
+/// Fails if:
+/// - `vendor` is invalid.
+/// - `limit > i64::MAX`.
+/// - `offset > i64::MAX`.
+/// - An error occurs during communication with the database.
+#[server]
+pub async fn vendor_orders(
+    vendor: Id<Vendor>,
+    limit: usize,
+    offset: usize,
+) -> Result<Box<[OrderVendorView]>> {
+    query_as!(
+        OrderVendorViewRepr,
+        r#"
+        SELECT time, number, status AS "status: OrderStatus",
+            p.id AS product, p.name AS product_name, time > updated_at AS "product_changed!"
+        FROM orders o
+        JOIN products p ON p.id = o.product
+        WHERE p.vendor = $1
+        ORDER BY time DESC
+        LIMIT $2
+        OFFSET $3
+        "#,
+        vendor.get(),
+        i64::try_from(limit)?,
+        i64::try_from(offset)?,
+    )
+    .fetch_all(&*POOL)
+    .await
+    .map(|orders| orders.into_iter().map(Into::into).collect())
+    .map_err(Into::into)
 }
 
 #[server]
