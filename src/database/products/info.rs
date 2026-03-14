@@ -2,7 +2,7 @@
 //! pages.
 
 use crate::database::{
-    Amount, AverageRating, Category, Customer, Deal, Id, Product, Rating, Url, Vendor,
+    Amount, AverageRating, Category, Customer, Deal, Id, Order, Product, Rating, Url, Vendor,
 };
 use dioxus::prelude::*;
 use rust_decimal::Decimal;
@@ -11,8 +11,8 @@ use std::num::NonZeroU32;
 use time::PrimitiveDateTime;
 #[cfg(feature = "server")]
 use {
-    crate::database::{POOL, RawId},
-    sqlx::{Type, query_as},
+    crate::database::{POOL, QueryResultExt as _, RawId},
+    sqlx::{Type, query, query_as},
     std::cmp::Reverse,
 };
 
@@ -242,7 +242,7 @@ pub async fn product_info(
 
 /// A completed order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Order {
+pub struct OrderInfo {
     /// The time of purchase.
     pub time: PrimitiveDateTime,
     /// Purchases included in this order.
@@ -268,6 +268,8 @@ pub struct Purchase {
     /// Whether the product has changed since the order was made. This should be marked by an
     /// indicator.
     pub product_changed: bool,
+    /// The status of the purchase.
+    pub status: OrderStatus,
 }
 
 #[cfg(feature = "server")]
@@ -279,6 +281,7 @@ struct PurchaseRepr {
     thumbnail: String,
     vendor_name: String,
     product_changed: bool,
+    status: OrderStatus,
 }
 
 #[cfg(feature = "server")]
@@ -292,6 +295,7 @@ impl From<PurchaseRepr> for Purchase {
             thumbnail,
             vendor_name,
             product_changed,
+            status,
         }: PurchaseRepr,
     ) -> Self {
         Self {
@@ -304,8 +308,25 @@ impl From<PurchaseRepr> for Purchase {
             thumbnail: thumbnail.into(),
             vendor_name: vendor_name.into(),
             product_changed,
+            status,
         }
     }
+}
+
+/// The status of an order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(Type))]
+#[cfg_attr(
+    feature = "server",
+    sqlx(type_name = "order_status", rename_all = "lowercase")
+)]
+pub enum OrderStatus {
+    /// Order has been placed.
+    Pending,
+    /// Vendor has sent the order.
+    Shipped,
+    /// Customer has received the order; completed.
+    Received,
 }
 
 /// Get orders made by a customer sorted by recency.
@@ -318,11 +339,15 @@ impl From<PurchaseRepr> for Purchase {
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
 #[server]
-pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Result<Box<[Order]>> {
+pub async fn orders(
+    customer: Id<Customer>,
+    limit: usize,
+    offset: usize,
+) -> Result<Box<[OrderInfo]>> {
     let orders = query_as!(
         PurchaseRepr,
         r#"
-        SELECT time, paid, number, p.name AS product_name, p.thumbnail,
+        SELECT time, paid, number, status AS "status: OrderStatus", p.name AS product_name, p.thumbnail,
             display_name AS vendor_name, time > updated_at AS "product_changed!"
         FROM orders o
         JOIN products p ON p.id = o.product
@@ -340,13 +365,13 @@ pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Resu
     .await?
     .into_iter()
     .map(|purchase| (purchase.time, Purchase::from(purchase)))
-    .fold(Vec::<Order>::new(), |mut acc, (time, purchase)| {
+    .fold(Vec::<OrderInfo>::new(), |mut acc, (time, purchase)| {
         if let Some(last) = acc.last_mut()
             && time == last.time
         {
             last.purchases.push(purchase);
         } else {
-            acc.push(Order {
+            acc.push(OrderInfo {
                 time,
                 purchases: vec![purchase],
             });
@@ -359,4 +384,17 @@ pub async fn orders(customer: Id<Customer>, limit: usize, offset: usize) -> Resu
         "Orders not sorted."
     );
     Ok(orders.into())
+}
+
+#[server]
+pub async fn set_status(order: Id<Order>, status: OrderStatus) -> Result<()> {
+    query!(
+        "UPDATE orders SET status = $2 WHERE id = $1",
+        order.get(),
+        status as OrderStatus,
+    )
+    .execute(&*POOL)
+    .await?
+    .by_unique_key()
+    .map_err(Into::into)
 }

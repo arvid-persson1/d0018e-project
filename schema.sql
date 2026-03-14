@@ -43,6 +43,8 @@ CREATE TYPE VOTE AS ENUM ('like', 'dislike');
 
 CREATE TYPE ROLE AS ENUM ('customer', 'vendor', 'administrator');
 
+CREATE TYPE ORDER_STATUS AS ENUM ('pending', 'shipped', 'received');
+
 CREATE TABLE users (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     username USERNAME UNIQUE NOT NULL,
@@ -953,7 +955,9 @@ CREATE TABLE orders (
     -- as deleting it. The important part, that being the user and the price, is still kept. If
     -- proper audit logging is important, the product table needs a redesign.
     product INT REFERENCES products(id) ON DELETE SET NULL,
-    time NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    placed_at NONFUTURE_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- TODO: Add constraints on updates following a stricter state machine.
+    status ORDER_STATUS NOT NULL,
     -- A more strict history could be maintained. For example, it might be desirable to store a
     -- copy of the deal from the special offers used (or at least the discount), and basic
     -- information in the case that the product is deleted.
@@ -1101,8 +1105,8 @@ BEGIN
     FROM results r
     WHERE r.special_offer = special_offer_uses.special_offer AND customer = customer_id AND uses > 0;
 
-    INSERT INTO orders (customer, product, number, paid)
-    SELECT customer_id, product, number, price
+    INSERT INTO orders (customer, product, status, number, paid)
+    SELECT customer_id, product, 'pending', number, price
     FROM results;
 END;
 $$;

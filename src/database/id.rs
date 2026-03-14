@@ -190,3 +190,9 @@ impl Key for Comment {}
 pub struct SpecialOffer;
 impl Sealed for SpecialOffer {}
 impl Key for SpecialOffer {}
+
+/// Marker for order IDs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Order;
+impl Sealed for Order {}
+impl Key for Order {}
