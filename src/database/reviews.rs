@@ -307,7 +307,7 @@ pub async fn product_reviews(
     let mut review_ids = Vec::with_capacity(limit);
 
     let mut tx = POOL
-        .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
+        .begin_with("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
         .await?;
 
     let reviews = query_as!(
@@ -474,7 +474,7 @@ pub async fn product_reviews_as(
     let mut review_ids = Vec::with_capacity(limit + 1);
 
     let mut tx = POOL
-        .begin_with("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;")
+        .begin_with("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
         .await?;
 
     let own_review = query_as!(
