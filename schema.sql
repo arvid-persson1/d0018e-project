@@ -417,8 +417,11 @@ LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE AS $$
 DECLARE
     discount TWOPOINT_UDEC;
 BEGIN
+    -- No special offer.
+    IF new_price IS NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
+        RETURN NULL;
     -- Variant 1.
-    IF new_price IS NOT NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
+    ELSIF new_price IS NOT NULL AND quantity1 IS NULL AND quantity2 IS NULL THEN
         IF new_price >= base_price THEN
             RAISE EXCEPTION 'New price (%) is not less than base price (%).', new_price, base_price;
         END IF;
@@ -464,8 +467,10 @@ LANGUAGE plpgsql STABLE AS $$
 DECLARE
     base_price products.price%TYPE;
 BEGIN
-    SELECT price INTO STRICT base_price FROM products WHERE id = NEW.product;
-    PERFORM average_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2);
+    PERFORM average_discount(base_price, NEW.new_price, NEW.quantity1, NEW.quantity2)
+    FROM products
+    WHERE id = NEW.product;
+
     RETURN NEW;
 END;
 $$;
@@ -480,6 +485,7 @@ BEGIN
     PERFORM average_discount(NEW.price, new_price, quantity1, quantity2)
     FROM special_offers so
     WHERE so.product = NEW.id AND (so.valid_until IS NULL OR so.valid_until > CURRENT_TIMESTAMP);
+
     RETURN NEW;
 END;
 $$;
