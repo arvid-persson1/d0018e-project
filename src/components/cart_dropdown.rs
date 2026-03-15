@@ -1,54 +1,19 @@
 use crate::Route;
-use crate::database::login_info;
-#[cfg(feature = "web")]
-use crate::database::{Id, RawId, User};
 use crate::state::GlobalState;
 use dioxus::prelude::*;
-
+ 
 /// Kundvagns-dropdown som visas när man klickar på kundvagnsknappen.
 #[component]
 pub fn CartDropdown(on_close: EventHandler<()>) -> Element {
     let mut global_state = use_context::<Signal<GlobalState>>();
-    let cart = global_state.read().cart.clone();
-    let total = global_state.read().cart_total();
-    let count_text = if cart.len() == 1 {
-        "produkt"
-    } else {
-        "produkter"
-    };
-
-    #[cfg(feature = "web")]
-    let mut user_id = use_signal(|| None);
-    #[cfg(not(feature = "web"))]
-    let user_id = use_signal(|| None);
-
-    _ = use_effect(move || {
-        #[cfg(feature = "web")]
-        {
-            use web_sys::{HtmlDocument, wasm_bindgen::JsCast as _, window};
-            if let Some(window) = window()
-                && let Some(document) = window.document()
-                && let Ok(html) = document.dyn_into::<HtmlDocument>()
-                && let Ok(cookies) = html.cookie()
-                && let Some(value) = cookies
-                    .split(';')
-                    .filter_map(|pair| pair.split_once('='))
-                    .find(|(key, _)| key.trim() == "user_id")
-                    .map(|(_, value)| value)
-                && let Ok(id) = value.parse::<RawId>()
-            {
-                user_id.set(Some(Id::<User>::from(id)))
-            }
-        }
-    });
-    let login_info = use_server_future(move || async move {
-        if let Some(user_id) = user_id() {
-            Some(login_info(user_id).await.unwrap())
-        } else {
-            None
-        }
-    })?;
-
+    let cart        = global_state.read().cart.clone();
+    let total       = global_state.read().cart_total();
+    let is_customer = global_state.read().login.as_ref()
+        .is_some_and(|l| matches!(l.id, crate::database::LoginId::Customer(_)));
+    let customer_id = global_state.read().customer_id();
+ 
+    let count_text = if cart.len() == 1 { "produkt" } else { "produkter" };
+ 
     rsx! {
         // Backdrop
         div { class: "fixed inset-0 z-40", onclick: move |_| on_close.call(()) }
@@ -70,20 +35,14 @@ pub fn CartDropdown(on_close: EventHandler<()>) -> Element {
                     div { class: "flex flex-col items-center justify-center py-12 text-gray-400",
                         i { class: "fa-solid fa-basket-shopping text-4xl mb-3" }
                         p { class: "font-semibold", "Kundvagnen är tom" }
-                        if let Some(None) = login_info() {
-                            p { class: "text-xs mt-1 text-center px-4", "Logga in för att handla" }
-                        }
                     }
                 } else {
                     for item in cart.iter() {
                         div { class: "flex items-center gap-3 p-3 border-b hover:bg-gray-50 transition",
-                            // Produktbild
                             img {
                                 src: "{item.image_url}",
                                 class: "w-14 h-14 object-cover rounded-lg bg-gray-100 shrink-0",
                             }
-
-                            // Namn och pris
                             div { class: "flex-grow min-w-0",
                                 p { class: "font-semibold text-sm text-gray-900 truncate",
                                     "{item.name}"
@@ -92,36 +51,84 @@ pub fn CartDropdown(on_close: EventHandler<()>) -> Element {
                                     "{item.price:.2} kr/st"
                                 }
                             }
-
-                            // Antal-kontroller
                             div { class: "flex items-center gap-1 shrink-0",
                                 button {
-                                    class: "w-7 h-7 rounded-full border flex items-center justify-center hover:bg-gray-100 transition text-sm font-bold",
+                                    class: "w-7 h-7 rounded-full border flex items-center justify-center hover:bg-gray-100 transition text-sm font-bold text-green-700",
                                     onclick: {
                                         let id = item.product_id;
                                         let qty = item.quantity;
-                                        move |_| global_state.write().set_quantity(id, qty.saturating_sub(1))
+                                        move |_| {
+                                            let new_qty = qty.saturating_sub(1);
+                                            global_state.write().set_quantity(id, new_qty);
+                                            if let Some(cid) = customer_id {
+                                                #[allow(unused_results)]
+                                                spawn(async move {
+                                                    use crate::database::{Id, Product};
+                                                    drop(
+                                                        crate::database::cart::set_in_shopping_cart(
+                                                                cid,
+                                                                Id::<Product>::from(id),
+                                                                new_qty,
+                                                            )
+                                                            .await,
+                                                    );
+                                                });
+                                            }
+                                        }
                                     },
                                     "−"
                                 }
-                                span { class: "w-6 text-center text-sm font-bold", "{item.quantity}" }
+                                span { class: "w-6 text-center text-sm font-bold text-green-600",
+                                    "{item.quantity}"
+                                }
                                 button {
-                                    class: "w-7 h-7 rounded-full border flex items-center justify-center hover:bg-gray-100 transition text-sm font-bold",
+                                    class: "w-7 h-7 rounded-full border flex items-center justify-center hover:bg-gray-100 transition text-sm font-bold text-green-700",
                                     onclick: {
                                         let id = item.product_id;
                                         let qty = item.quantity;
-                                        move |_| global_state.write().set_quantity(id, qty + 1)
+                                        move |_| {
+                                            let new_qty = qty + 1;
+                                            global_state.write().set_quantity(id, new_qty);
+                                            if let Some(cid) = customer_id {
+                                                #[allow(unused_results)]
+                                                spawn(async move {
+                                                    use crate::database::{Id, Product};
+                                                    drop(
+                                                        crate::database::cart::set_in_shopping_cart(
+                                                                cid,
+                                                                Id::<Product>::from(id),
+                                                                new_qty,
+                                                            )
+                                                            .await,
+                                                    );
+                                                });
+                                            }
+                                        }
                                     },
                                     "+"
                                 }
                             }
-
-                            // Ta bort
                             button {
                                 class: "ml-1 text-gray-300 hover:text-red-500 transition shrink-0",
                                 onclick: {
                                     let id = item.product_id;
-                                    move |_| global_state.write().remove_from_cart(id)
+                                    move |_| {
+                                        global_state.write().remove_from_cart(id);
+                                        if let Some(cid) = customer_id {
+                                            #[allow(unused_results)]
+                                            spawn(async move {
+                                                use crate::database::{Id, Product};
+                                                drop(
+                                                    crate::database::cart::set_in_shopping_cart(
+                                                            cid,
+                                                            Id::<Product>::from(id),
+                                                            0,
+                                                        )
+                                                        .await,
+                                                );
+                                            });
+                                        }
+                                    }
                                 },
                                 i { class: "fa-solid fa-trash text-sm" }
                             }
@@ -130,7 +137,7 @@ pub fn CartDropdown(on_close: EventHandler<()>) -> Element {
                 }
             }
 
-            // Footer med totalt och checkout
+            // Footer
             if !cart.is_empty() {
                 div { class: "p-4 border-t bg-gray-50",
                     div { class: "flex justify-between items-center mb-3",
@@ -138,17 +145,15 @@ pub fn CartDropdown(on_close: EventHandler<()>) -> Element {
                         span { class: "font-black text-xl text-gray-900", "{total:.2} kr" }
                     }
 
-                    if login_info().flatten().is_some() {
-                        // TODO(auth): När inloggad, koppla checkout till DB
+                    if is_customer {
                         Link {
-                            to: Route::Home {}, // TODO: Route::Checkout när den finns
+                            to: Route::Cart {},
                             class: "w-full bg-green-700 text-white py-3 rounded-xl font-black text-center flex items-center justify-center gap-2 hover:bg-green-800 transition",
                             onclick: move |_| on_close.call(()),
                             i { class: "fa-solid fa-lock text-sm" }
                             "Gå till kassan"
                         }
                     } else {
-                        // Ej inloggad — visa disabled knapp + uppmaning
                         div { class: "space-y-2",
                             button {
                                 class: "w-full bg-gray-200 text-gray-400 py-3 rounded-xl font-black cursor-not-allowed flex items-center justify-center gap-2",

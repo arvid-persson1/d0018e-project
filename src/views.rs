@@ -32,6 +32,6 @@ pub use search::Search;
 mod auth;
 pub use auth::{Login, Register, VendorLogin, VendorRegister};
 
-/// Administration view.
-mod administration;
-pub use administration::Administration;
+/// Se [`CartPage`].
+mod cart;
+pub use cart::CartPage;

@@ -144,6 +144,7 @@ fn DiscountedSlider(props: DiscountedSliderProps) -> Element {
                                     .unwrap_or_else(|| p.price.to_f64().unwrap_or_default()),
                                 comparison_price: format!("{:.2} kr / {}", p.price, p.amount_per_unit),
                                 image_url: p.thumbnail.to_string(),
+                                in_stock: u32::MAX,
                             }
                         }
                     }
@@ -220,6 +221,7 @@ fn NewestSlider(props: NewestSliderProps) -> Element {
                                 price: p.price.to_f64().unwrap_or_default(),
                                 comparison_price: format!("{:.2} kr / {}", p.price, p.amount_per_unit),
                                 image_url: p.thumbnail.to_string(),
+                                in_stock: u32::MAX,
                             }
                         }
                     }

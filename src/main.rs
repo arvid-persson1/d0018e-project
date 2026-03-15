@@ -15,8 +15,8 @@ use state::GlobalState;
 
 use dioxus::prelude::*;
 use views::{
-    Administration, CategoryPage, CustomerProfile, FavoritesPage, Home, Login, Product,
-    ProfilePage, Register, Search, VendorLogin, VendorPage, VendorRegister,
+    CategoryPage, CustomerProfile, FavoritesPage, Home, Login, Product,
+    ProfilePage, Register, Search, VendorLogin, VendorPage, VendorRegister, CartPage,
 };
 
 /// Structure of all non-internal endpoints.
@@ -72,17 +72,15 @@ enum Route {
     /// See [`VendorRegister`].
     #[route("/vendor-register", VendorRegister)]
     VendorRegister,
-    /// See [`Administration`].
-    #[route("/admin", Administration)]
-    Administration,
-    // TODO: Shopping cart page.
+    /// Se [`CartPage`].
+    #[route("/cart", CartPage)]
+    Cart,
 }
 
 #[allow(non_snake_case)]
 #[component]
 fn App() -> Element {
-    #[cfg_attr(not(feature = "web"), expect(unused_mut, unused_variables))]
-    let mut global_state = use_context_provider(|| Signal::new(GlobalState::default()));
+    let mut global_state = use_context_provider(|| Signal::new(GlobalState::begin_auth()));
 
     let _effect = use_effect(move || {
         let _task = spawn(async move {
@@ -106,23 +104,55 @@ fn App() -> Element {
                         match login_info(Id::<User>::from(id)).await {
                             Ok(info) => {
                                 global_state.write().login = Some(info);
-
                                 let customer_id = global_state.read().customer_id();
-                                if let Some(customer_id) = customer_id {
-                                    if let Ok(favs) =
-                                        crate::database::products::favorites(customer_id, 1000, 0)
-                                            .await
-                                    {
+                                if let Some(cid) = customer_id {
+                                    // Ladda favoriter
+                                    if let Ok(favs) = crate::database::products::favorites(cid, 1000, 0).await {
                                         global_state.write().favorites =
                                             favs.iter().map(|p| p.id.get()).collect();
                                     }
+                                    // Hämta local cart (lagd innan auth var klar)
+                                    let local_cart = global_state.read().cart.clone();
+                                    // Synka med DB
+                                    match crate::database::cart::cart_products(cid).await {
+                                        Ok((db_products, _)) => {
+                                            if db_products.is_empty() && !local_cart.is_empty() {
+                                                // Local → DB
+                                                for item in local_cart.iter() {
+                                                    let pid = crate::database::Id::<crate::database::Product>::from(item.product_id);
+                                                    drop(crate::database::cart::set_in_shopping_cart(cid, pid, item.quantity).await);
+                                                }
+                                            } else if !db_products.is_empty() {
+                                                // DB → local state
+                                                global_state.write().cart = db_products
+                                                    .iter()
+                                                    .map(|p| crate::state::CartItem {
+                                                        product_id: p.id.get(),
+                                                        name: p.name.to_string(),
+                                                        price: p.price.to_string().parse::<f64>().unwrap_or(0.0),
+                                                        image_url: p.thumbnail.to_string(),
+                                                        quantity: p.count.get(),
+                                                    })
+                                                    .collect();
+                                            }
+                                        }
+                                        Err(_) => {
+                                            // DB misslyckades — synka local → DB ändå
+                                            for item in local_cart.iter() {
+                                                let pid = crate::database::Id::<crate::database::Product>::from(item.product_id);
+                                                drop(crate::database::cart::set_in_shopping_cart(cid, pid, item.quantity).await);
+                                            }
+                                        }
+                                    }
                                 }
-                            },
-                            Err(_e) => {},
+                            }
+                            Err(_) => {}
                         }
                     }
                 }
             }
+            // Auth-checken är klar, oavsett resultat.
+            global_state.write().auth_loading = false;
         });
     });
     rsx! {

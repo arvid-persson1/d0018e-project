@@ -80,6 +80,7 @@ pub fn FavoritesPage() -> Element {
                                 price: p.price.to_f64().unwrap_or_default(),
                                 comparison_price: format!("{:.2} kr", p.price),
                                 image_url: p.thumbnail.to_string(),
+                                in_stock: u32::MAX,
                             }
                         }
                     }

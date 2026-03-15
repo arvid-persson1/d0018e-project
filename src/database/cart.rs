@@ -109,7 +109,7 @@ pub async fn set_in_shopping_cart(
         )
         .execute(&*POOL)
         .await
-        .map(QueryResultExt::expect_one)
+        .map(QueryResultExt::allow_any)
         .map_err(Into::into)
     }
 }
@@ -152,6 +152,8 @@ pub struct CartProduct {
     pub in_stock: u32,
     /// How many units are in the cart.
     pub count: NonZeroU32,
+    /// special offer ID
+    pub special_offer_id: Option<Id<crate::database::SpecialOffer>>,
     /// The currently active special offer on the product, if any and if the user is eligible.
     pub special_offer_deal: Option<Deal>,
     /// How many more times the customer can benefit from the special offer, if there's a limit.
@@ -173,6 +175,7 @@ struct CartProductRepr {
     price: Decimal,
     in_stock: i32,
     count: i32,
+    special_offer_id: Option<i32>,
     new_price: Option<Decimal>,
     quantity1: Option<i32>,
     quantity2: Option<i32>,
@@ -191,6 +194,7 @@ impl From<CartProductRepr> for CartProduct {
             price,
             in_stock,
             count,
+            special_offer_id,
             new_price,
             quantity1,
             quantity2,
@@ -211,6 +215,7 @@ impl From<CartProductRepr> for CartProduct {
                 .ok()
                 .and_then(|count| count.try_into().ok())
                 .expect("Database returned non-positive cart item count."),
+            special_offer_id: special_offer_id.map(Into::into),
             special_offer_deal: Deal::try_from_repr(new_price, quantity1, quantity2, price)
                 .expect("Database returned invalid special offer."),
             special_offer_remaining_uses: remaining_uses.map(|uses| {
@@ -241,6 +246,7 @@ pub async fn cart_products(
         CartProductRepr,
         r#"
         SELECT p.id, name, thumbnail, price, in_stock, s.number AS count,
+            aso.id AS special_offer_id,
             new_price, quantity1, quantity2, COALESCE(members_only, FALSE) AS "members_only!",
             limit_per_customer - COALESCE(sou.number, 0) AS remaining_uses,
             EXISTS (
@@ -277,13 +283,13 @@ pub async fn cart_products(
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckoutItem {
     /// The ID of the product.
-    product: Id<Product>,
+    pub product: Id<Product>,
     /// The number of units.
-    number: NonZeroU32,
+    pub number: NonZeroU32,
     /// The special offer the customer expects to be applied, if any.
-    special_offer: Option<Id<SpecialOffer>>,
+    pub special_offer: Option<Id<SpecialOffer>>,
     /// The price the customer expects to pay.
-    expected_price: Decimal,
+    pub expected_price: Decimal,
 }
 
 #[cfg(feature = "server")]
@@ -355,6 +361,6 @@ pub async fn checkout(
     )
     .execute(&*POOL)
     .await
-    .map(QueryResultExt::procedure)
+    .map(QueryResultExt::allow_any)
     .map_err(Into::into)
 }

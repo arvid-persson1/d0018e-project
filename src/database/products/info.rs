@@ -255,6 +255,8 @@ pub struct OrderInfo {
 /// [`Order`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Purchase {
+    /// The ID of the order row.
+    pub id: Id<Order>,
     /// How much was paid.
     pub paid: Decimal,
     /// How many units were purchased.
@@ -274,6 +276,7 @@ pub struct Purchase {
 
 #[cfg(feature = "server")]
 struct PurchaseRepr {
+    id: RawId,
     time: PrimitiveDateTime,
     paid: Decimal,
     number: i32,
@@ -288,6 +291,7 @@ struct PurchaseRepr {
 impl From<PurchaseRepr> for Purchase {
     fn from(
         PurchaseRepr {
+            id,
             time: _,
             paid,
             number,
@@ -299,6 +303,7 @@ impl From<PurchaseRepr> for Purchase {
         }: PurchaseRepr,
     ) -> Self {
         Self {
+            id: id.into(),
             paid,
             number: u32::try_from(number)
                 .ok()
@@ -347,8 +352,8 @@ pub async fn customer_orders(
     let orders = query_as!(
         PurchaseRepr,
         r#"
-        SELECT time, paid, number, status AS "status: OrderStatus", p.name AS product_name, p.thumbnail,
-            display_name AS vendor_name, time > updated_at AS "product_changed!"
+        SELECT o.id, time, paid, number, status AS "status: OrderStatus", p.name AS product_name, p.thumbnail,
+            display_name AS vendor_name, updated_at > time AS "product_changed!"
         FROM orders o
         JOIN products p ON p.id = o.product
         JOIN vendors ON vendors.id = p.vendor
@@ -389,6 +394,8 @@ pub async fn customer_orders(
 /// A vendor's view of an order of one of their products.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrderVendorView {
+    /// The ID of the order.
+    pub id: Id<Order>,
     /// The time of purchase.
     pub time: PrimitiveDateTime,
     /// The product purchased.
@@ -403,9 +410,10 @@ pub struct OrderVendorView {
     /// The status of the purchase.
     pub status: OrderStatus,
 }
-
+ 
 #[cfg(feature = "server")]
 struct OrderVendorViewRepr {
+    id: RawId,
     time: PrimitiveDateTime,
     product: i32,
     product_name: String,
@@ -413,11 +421,12 @@ struct OrderVendorViewRepr {
     product_changed: bool,
     status: OrderStatus,
 }
-
+ 
 #[cfg(feature = "server")]
 impl From<OrderVendorViewRepr> for OrderVendorView {
     fn from(
         OrderVendorViewRepr {
+            id,
             time,
             product,
             product_name,
@@ -427,6 +436,7 @@ impl From<OrderVendorViewRepr> for OrderVendorView {
         }: OrderVendorViewRepr,
     ) -> Self {
         Self {
+            id: id.into(),
             time,
             product: product.into(),
             product_name: product_name.into(),
@@ -439,7 +449,7 @@ impl From<OrderVendorViewRepr> for OrderVendorView {
         }
     }
 }
-
+ 
 /// Get orders for a vendor's products sorted by recency.
 ///
 /// # Errors
@@ -458,8 +468,8 @@ pub async fn vendor_orders(
     query_as!(
         OrderVendorViewRepr,
         r#"
-        SELECT time, number, status AS "status: OrderStatus",
-            p.id AS product, p.name AS product_name, time > updated_at AS "product_changed!"
+        SELECT o.id, time, number, status AS "status: OrderStatus",
+            p.id AS product, p.name AS product_name, updated_at > time AS "product_changed!"
         FROM orders o
         JOIN products p ON p.id = o.product
         WHERE p.vendor = $1
