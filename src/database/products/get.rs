@@ -458,7 +458,7 @@ pub async fn products_by_category(
         LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
         WHERE visible AND category = $2 AND in_stock > 0 AND ($3::INT IS NULL OR p.id != $3)
-        ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC
+        ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC NULLS LAST
         LIMIT $4
         OFFSET $5
         "#,
@@ -566,7 +566,7 @@ pub async fn vendor_products(
         FROM products p
         LEFT JOIN active_special_offers ON product = p.id
         WHERE (p.visible OR $5) AND p.vendor = $2 AND p.in_stock > 0
-        ORDER BY average_discount(p.price, new_price, quantity1, quantity2) DESC, p.name
+        ORDER BY average_discount(p.price, new_price, quantity1, quantity2) DESC NULLS LAST, p.name
         LIMIT $3
         OFFSET $4
         "#,
