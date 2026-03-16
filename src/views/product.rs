@@ -189,22 +189,25 @@ fn CommentNode(
                                     class: if reply_loading() { "text-xs bg-gray-300 text-gray-500 px-3 py-1 rounded-lg cursor-not-allowed" } else { "text-xs bg-green-700 text-white px-3 py-1 rounded-lg hover:bg-green-800 transition" },
                                     disabled: reply_loading(),
                                     onclick: move |_| {
-                                        if let Some(cid) = customer_id {
-                                            let text = reply_text().trim().to_string();
-                                            if text.is_empty() {
-                                                return;
-                                            }
-                                            reply_loading.set(true);
-                                            let user_id: Id<crate::database::User> = cid.into();
-                                            #[allow(unused_results)]
-                                            spawn(async move {
-                                                drop(create_reply(user_id, comment_id, text.into()).await);
-                                                reply_loading.set(false);
-                                                show_reply.set(false);
-                                                reply_text.set(String::new());
-                                                on_refresh.call(());
-                                            });
+                                        let user_id: Option<Id<crate::database::User>> = customer_id
+                                            .map(Into::into)
+                                            .or_else(|| if is_vendor { Some(vendor_id.into()) } else { None });
+                                        let Some(user_id) = user_id else {
+                                            return;
+                                        };
+                                        let text = reply_text().trim().to_string();
+                                        if text.is_empty() {
+                                            return;
                                         }
+                                        reply_loading.set(true);
+                                        #[allow(unused_results)]
+                                        spawn(async move {
+                                            drop(create_reply(user_id, comment_id, text.into()).await);
+                                            reply_loading.set(false);
+                                            show_reply.set(false);
+                                            reply_text.set(String::new());
+                                            on_refresh.call(());
+                                        });
                                     },
                                     if reply_loading() {
                                         "Skickar..."
@@ -254,7 +257,7 @@ fn ReviewCard(
     let is_vendor   = gs.read().login.as_ref().is_some_and(|l| {
         matches!(l.id, crate::database::LoginId::Vendor(vid) if vid == vendor_id)
     });
-    let can_comment = (is_buyer || is_vendor) && customer_id.is_some();
+    let can_comment = is_buyer || is_vendor;
  
     rsx! {
         div { class: "bg-white border border-gray-100 rounded-2xl p-5 shadow-sm",
@@ -353,22 +356,24 @@ fn ReviewCard(
                                     class: if comment_loading() { "text-xs bg-gray-300 text-gray-500 px-3 py-1 rounded-lg cursor-not-allowed" } else { "text-xs bg-green-700 text-white px-3 py-1 rounded-lg hover:bg-green-800 transition" },
                                     disabled: comment_loading(),
                                     onclick: move |_| {
-                                        if let Some(cid) = customer_id {
-                                            let text = comment_text().trim().to_string();
-                                            if text.is_empty() {
-                                                return;
-                                            }
-                                            comment_loading.set(true);
-                                            let user_id: Id<crate::database::User> = cid.into();
-                                            #[allow(unused_results)]
-                                            spawn(async move {
-                                                drop(create_comment(user_id, review_id, text.into()).await);
-                                                comment_loading.set(false);
-                                                show_comment.set(false);
-                                                comment_text.set(String::new());
-                                                on_refresh.call(());
-                                            });
+                                        let user_id: Id<crate::database::User> = if let Some(cid) = customer_id {
+                                            cid.into()
+                                        } else {
+                                            vendor_id.into()
+                                        };
+                                        let text = comment_text().trim().to_string();
+                                        if text.is_empty() {
+                                            return;
                                         }
+                                        comment_loading.set(true);
+                                        #[allow(unused_results)]
+                                        spawn(async move {
+                                            drop(create_comment(user_id, review_id, text.into()).await);
+                                            comment_loading.set(false);
+                                            show_comment.set(false);
+                                            comment_text.set(String::new());
+                                            on_refresh.call(());
+                                        });
                                     },
                                     if comment_loading() {
                                         "Skickar..."

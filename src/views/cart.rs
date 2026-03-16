@@ -17,7 +17,7 @@ pub fn CartPage() -> Element {
     let auth_loading = global_state.read().auth_loading;
     let customer_id  = global_state.read().customer_id();
  
-    // Hämta cart från DB — triggas om när customer_id eller auth_loading ändras
+    // Hämta cart från DB
     let mut cart_resource = use_resource(move || async move {
         let auth_loading = global_state.read().auth_loading;
         let cid = global_state.read().customer_id();
@@ -270,7 +270,7 @@ pub fn CartPage() -> Element {
                         }
                     }
                 } else {
-                    // Ej inloggad — visa local state cart
+                    // Ej inloggad
                     {
                         let local_cart = global_state.read().cart.clone();
                         let total = global_state.read().cart_total();
