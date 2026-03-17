@@ -434,7 +434,6 @@ pub async fn newest_products(
 /// - `limit > i64::MAX`.
 /// - `offset > i64::MAX`.
 /// - An error occurs during communication with the database.
-// TODO: Include products in subcategories.
 #[server]
 pub async fn products_by_category(
     customer: Option<Id<Customer>>,
@@ -457,7 +456,8 @@ pub async fn products_by_category(
         FROM products p
         LEFT JOIN active_special_offers ON product = p.id
         JOIN vendors ON vendors.id = p.vendor
-        WHERE visible AND category = $2 AND in_stock > 0 AND ($3::INT IS NULL OR p.id != $3)
+        WHERE visible AND in_stock > 0 AND ($3::INT IS NULL OR p.id != $3)
+            AND category = ANY(SELECT id FROM UNNEST(category_path($2)))
         ORDER BY average_discount(price, new_price, quantity1, quantity2) DESC NULLS LAST
         LIMIT $4
         OFFSET $5

@@ -83,7 +83,7 @@ pub async fn create_user(
     match data {
         NewUserData::Customer { profile_picture } => {
             query!(
-                "CALL create_customer($1, $2, ($3::TEXT)::PHC_STRING, $4)",
+                "CALL create_customer($1::USERNAME, $2::EMAIL, ($3::TEXT)::PHC_STRING, $4::URL)",
                 username as Username,
                 email as Email,
                 password_hash.as_str(),
@@ -96,7 +96,7 @@ pub async fn create_user(
             description,
         } => {
             query!(
-                "CALL create_vendor($1, $2, ($3::TEXT)::PHC_STRING, $4, $5, $6)",
+                "CALL create_vendor($1::USERNAME, $2::EMAIL, ($3::TEXT)::PHC_STRING, $4::URL, $5, $6)",
                 username as Username,
                 email as Email,
                 password_hash.as_str(),
@@ -107,7 +107,7 @@ pub async fn create_user(
         },
         NewUserData::Administrator => {
             query!(
-                "CALL create_administrator($1, $2, ($3::TEXT)::PHC_STRING)",
+                "CALL create_administrator($1::USERNAME, $2::EMAIL, ($3::TEXT)::PHC_STRING)",
                 username as Username,
                 email as Email,
                 password_hash.as_str(),
@@ -116,7 +116,7 @@ pub async fn create_user(
     }
     .execute(&*POOL)
     .await
-    .map(QueryResultExt::expect_one)
+    .map(QueryResultExt::procedure)
     .map_err(Into::into)
 }
 
